@@ -2,12 +2,12 @@
   const cfg = window.RESTAURANT_CONFIG;
   const $ = (id) => document.getElementById(id);
   const money = (n) => `${cfg.currencySymbol}${Number(n || 0).toFixed(0)}`;
-  const escapeHtml = (v='') => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let menu = [], categories = [], settings = {}, cart = JSON.parse(localStorage.getItem('restaurant_cart') || '{}');
-  let selectedCategory = 'all', selectedType = 'all';
+  let selectedCategory = 'all';
   const cartCanvas = bootstrap.Offcanvas.getOrCreateInstance($('cartCanvas'));
   const checkoutModal = bootstrap.Modal.getOrCreateInstance($('checkoutModal'));
-  const toast = bootstrap.Toast.getOrCreateInstance($('siteToast'), {delay: 2200});
+  const toast = bootstrap.Toast.getOrCreateInstance($('siteToast'), { delay: 1600 });
 
   function notify(message) { $('toastMessage').textContent = message; toast.show(); }
   function saveCart() { localStorage.setItem('restaurant_cart', JSON.stringify(cart)); renderCart(); }
@@ -19,8 +19,8 @@
 
   function renderCategories() {
     const holder = $('categoryFilters');
-    holder.innerHTML = `<button class="filter-chip ${selectedCategory==='all'?'active':''}" data-category="all">All items</button>` +
-      categories.map(c => `<button class="filter-chip ${selectedCategory===c.id?'active':''}" data-category="${c.id}">${escapeHtml(c.name)}</button>`).join('');
+    holder.innerHTML = `<button class="filter-chip ${selectedCategory === 'all' ? 'active' : ''}" data-category="all">All items</button>` +
+      categories.map(c => `<button class="filter-chip ${selectedCategory === c.id ? 'active' : ''}" data-category="${c.id}">${escapeHtml(c.name)}</button>`).join('');
     holder.querySelectorAll('[data-category]').forEach(btn => btn.addEventListener('click', () => {
       selectedCategory = btn.dataset.category; renderCategories(); renderMenu();
     }));
@@ -30,9 +30,9 @@
     const q = $('searchInput').value.trim().toLowerCase();
     return menu.filter(item => {
       const categoryOK = selectedCategory === 'all' || item.category_id === selectedCategory;
-      const typeOK = selectedType === 'all' || item.food_type === selectedType;
+      const isVeg = !item.food_type || item.food_type === 'Veg';
       const queryOK = !q || `${item.name} ${item.description || ''}`.toLowerCase().includes(q);
-      return categoryOK && typeOK && queryOK && item.is_available;
+      return categoryOK && isVeg && queryOK && item.is_available;
     });
   }
 
@@ -41,15 +41,24 @@
     grid.innerHTML = '';
     $('menuEmpty').classList.toggle('d-none', items.length !== 0);
     items.forEach(item => {
-      const col = document.createElement('div'); col.className = 'col-12 col-sm-6 col-xl-4';
+      const col = document.createElement('div'); col.className = 'col-12 col-md-6 col-xl-4';
       const image = item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80';
-      col.innerHTML = `<article class="food-card h-100">
+      col.innerHTML = `<article class="food-card">
         <div class="food-image-wrap"><img src="${escapeHtml(image)}" alt="${escapeHtml(item.name)}" loading="lazy">
           ${item.is_bestseller ? '<span class="food-badge">Bestseller</span>' : ''}
-          <span class="food-type ${item.food_type==='Veg'?'is-veg':'is-nonveg'}"><i></i>${escapeHtml(item.food_type || 'Veg')}</span>
+          
         </div>
-        <div class="food-card-body"><div class="d-flex justify-content-between gap-2"><h3>${escapeHtml(item.name)}</h3><strong class="food-price">${money(item.price)}</strong></div>
-        <p>${escapeHtml(item.description || '')}</p><button class="btn btn-add w-100" data-add="${item.id}"><i class="bi bi-plus-lg me-2"></i>Add to cart</button></div></article>`;
+        <div class="food-card-body">
+          <div class="food-card-info">
+            <h3 class="food-title">${escapeHtml(item.name)}</h3>
+            <p class="food-desc">${escapeHtml(item.description || '')}</p>
+          </div>
+          <div class="food-card-action">
+            <strong class="food-price">${money(item.price)}</strong>
+            <button class="btn btn-add" data-add="${item.id}">+ Cart</button>
+          </div>
+        </div>
+      </article>`;
       grid.appendChild(col);
     });
     grid.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => addToCart(btn.dataset.add)));
@@ -59,8 +68,8 @@
     const item = menu.find(x => x.id === id);
     if (!item || !item.is_available) return notify('This item is currently unavailable.');
     const existing = cart[id];
-    cart[id] = {id:item.id, name:item.name, price:Number(item.price), image_url:item.image_url, quantity:existing ? existing.quantity + 1 : 1};
-    saveCart(); notify(`${item.name} added to cart`);
+    cart[id] = { id: item.id, name: item.name, price: Number(item.price), image_url: item.image_url, quantity: existing ? existing.quantity + 1 : 1 };
+    saveCart(); notify('Added to cart');
   }
   function changeQty(id, delta) {
     if (!cart[id]) return;
@@ -71,9 +80,12 @@
   function renderCart() {
     const rows = cartRows(), holder = $('cartItems');
     $('cartCount').textContent = cartCount();
-    $('mobileCartItems').textContent = `${cartCount()} item${cartCount()===1?'':'s'}`;
+    $('mobileCartItems').textContent = `${cartCount()} item${cartCount() === 1 ? '' : 's'}`;
     $('mobileCartTotal').textContent = money(total());
-    $('mobileCartBar').classList.toggle('d-none', cartCount() === 0);
+    const hasItems = cartCount() > 0;
+    $('mobileCartBar').classList.toggle('d-none', !hasItems);
+    const tc = $('siteToastContainer') || document.querySelector('.toast-container');
+    if (tc) tc.classList.toggle('above-cart-bar', hasItems);
     $('cartSubtotal').textContent = money(subtotal());
     $('cartDelivery').textContent = money(delivery());
     $('cartTotal').textContent = money(total());
@@ -82,10 +94,10 @@
       $('checkoutBtn').disabled = true; return;
     }
     $('checkoutBtn').disabled = false;
-    holder.innerHTML = rows.map(x => `<div class="cart-item"><img src="${escapeHtml(x.image_url || 'https://placehold.co/100x100?text=Food')}" alt=""><div class="flex-grow-1"><strong>${escapeHtml(x.name)}</strong><div class="text-muted small">${money(x.price)} each</div><div class="qty-control mt-2"><button data-minus="${x.id}" aria-label="Decrease quantity">−</button><span>${x.quantity}</span><button data-plus="${x.id}" aria-label="Increase quantity">+</button></div></div><div class="text-end"><strong>${money(x.price*x.quantity)}</strong><button class="remove-item" data-remove="${x.id}" aria-label="Remove item"><i class="bi bi-trash"></i></button></div></div>`).join('');
-    holder.querySelectorAll('[data-minus]').forEach(b=>b.addEventListener('click',()=>changeQty(b.dataset.minus,-1)));
-    holder.querySelectorAll('[data-plus]').forEach(b=>b.addEventListener('click',()=>changeQty(b.dataset.plus,1)));
-    holder.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{delete cart[b.dataset.remove];saveCart();}));
+    holder.innerHTML = rows.map(x => `<div class="cart-item"><img src="${escapeHtml(x.image_url || 'https://placehold.co/100x100?text=Food')}" alt=""><div class="flex-grow-1"><strong>${escapeHtml(x.name)}</strong><div class="text-muted small">${money(x.price)} each</div><div class="qty-control mt-2"><button data-minus="${x.id}" aria-label="Decrease quantity">−</button><span>${x.quantity}</span><button data-plus="${x.id}" aria-label="Increase quantity">+</button></div></div><div class="text-end"><strong>${money(x.price * x.quantity)}</strong><button class="remove-item" data-remove="${x.id}" aria-label="Remove item"><i class="bi bi-trash"></i></button></div></div>`).join('');
+    holder.querySelectorAll('[data-minus]').forEach(b => b.addEventListener('click', () => changeQty(b.dataset.minus, -1)));
+    holder.querySelectorAll('[data-plus]').forEach(b => b.addEventListener('click', () => changeQty(b.dataset.plus, 1)));
+    holder.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => { delete cart[b.dataset.remove]; saveCart(); }));
   }
 
   function showCheckout() {
@@ -98,8 +110,8 @@
   }
 
   function createOrderId() {
-    const date = new Date(), ymd = `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
-    return `ORD-${ymd}-${Math.floor(1000 + Math.random()*9000)}`;
+    const date = new Date(), ymd = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+    return `ORD-${ymd}-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
   $('checkoutForm').addEventListener('submit', (e) => {
@@ -109,12 +121,12 @@
     if (!cartCount()) { checkoutModal.hide(); return notify('Your cart is empty.'); }
     const phone = $('customerPhone').value.trim();
     if (!/^[6-9]\d{9}$/.test(phone)) { $('customerPhone').setCustomValidity('Invalid'); form.classList.add('was-validated'); $('customerPhone').reportValidity(); $('customerPhone').setCustomValidity(''); return; }
-    const number = String(settings.whatsapp_number || cfg.defaultWhatsAppNumber).replace(/\D/g,'');
+    const number = String(settings.whatsapp_number || cfg.defaultWhatsAppNumber).replace(/\D/g, '');
     if (!/^\d{10,15}$/.test(number)) {
       notify('Restaurant WhatsApp number is not configured. Ask the admin to update settings.'); return;
     }
     const orderId = createOrderId();
-    const lines = cartRows().map((x,i)=>`${i+1}. ${x.name}\n   ${x.quantity} x ${money(x.price)} = ${money(x.price*x.quantity)}`).join('\n\n');
+    const lines = cartRows().map((x, i) => `${i + 1}. ${x.name}\n   ${x.quantity} x ${money(x.price)} = ${money(x.price * x.quantity)}`).join('\n\n');
     const address = [$('customerAddress').value.trim(), $('customerArea').value.trim(), $('customerCity').value.trim()].filter(Boolean).join(', ');
     const message = [
       `*NEW RESTAURANT ORDER*`,
@@ -151,9 +163,9 @@
       return;
     }
     const [catRes, menuRes, settingsRes] = await Promise.all([
-      db.from('categories').select('*').eq('is_active',true).order('sort_order'),
-      db.from('menu_items').select('*').order('created_at',{ascending:false}),
-      db.from('restaurant_settings').select('*').eq('id',1).maybeSingle()
+      db.from('categories').select('*').eq('is_active', true).order('sort_order'),
+      db.from('menu_items').select('*').order('created_at', { ascending: false }),
+      db.from('restaurant_settings').select('*').eq('id', 1).maybeSingle()
     ]);
     if (catRes.error || menuRes.error) { $('menuError').classList.remove('d-none'); console.error(catRes.error || menuRes.error); return; }
     categories = catRes.data || [];
@@ -161,27 +173,29 @@
     settings = settingsRes.data || {};
     $('menuError').classList.add('d-none');
     const name = settings.restaurant_name || cfg.defaultRestaurantName;
-    $('restaurantName').textContent = name; $('footerRestaurantName').textContent = name; $('footerNameBottom').textContent = name;
-    $('openingHours').textContent = settings.opening_hours || 'Fresh food · Made with love';
-    $('restaurantAddress').textContent = settings.address || 'Add your restaurant address in admin settings.';
-    $('restaurantPhone').textContent = settings.contact_phone || 'Contact details';
-    $('restaurantHours').textContent = settings.opening_hours || '';
+    if ($('restaurantName')) $('restaurantName').textContent = name;
+    if ($('footerRestaurantName')) $('footerRestaurantName').textContent = name;
+    if ($('footerNameBottom')) $('footerNameBottom').textContent = name;
+    if ($('openingHours')) $('openingHours').textContent = settings.opening_hours || 'Fresh food · Made with love';
+    if ($('restaurantAddress')) $('restaurantAddress').textContent = settings.address || 'Add your restaurant address in admin settings.';
+    if ($('restaurantPhone')) $('restaurantPhone').textContent = settings.contact_phone || 'Contact details';
+    if ($('restaurantHours')) $('restaurantHours').textContent = settings.opening_hours || '';
     renderCategories(); renderMenu(); renderCart();
   }
 
   $('searchInput').addEventListener('input', renderMenu);
-  document.querySelectorAll('.type-chip').forEach(btn=>btn.addEventListener('click',()=>{
-    selectedType=btn.dataset.type; document.querySelectorAll('.type-chip').forEach(x=>x.classList.toggle('active',x===btn)); renderMenu();
-  }));
-  ['navCartBtn','mobileCartBtn'].forEach(id=>$(id).addEventListener('click',()=>cartCanvas.show()));
-  $('checkoutBtn').addEventListener('click',showCheckout);
+  ['navCartBtn', 'mobileCartBtn'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('click', () => cartCanvas.show());
+  });
+  $('checkoutBtn').addEventListener('click', showCheckout);
   $('year').textContent = new Date().getFullYear();
   renderCart();
-  loadData().then(()=>{
+  loadData().then(() => {
     if (window.db) db.channel('public-menu-live')
-      .on('postgres_changes',{event:'*',schema:'public',table:'menu_items'},loadData)
-      .on('postgres_changes',{event:'*',schema:'public',table:'categories'},loadData)
-      .on('postgres_changes',{event:'*',schema:'public',table:'restaurant_settings'},loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_settings' }, loadData)
       .subscribe();
   });
 })();
