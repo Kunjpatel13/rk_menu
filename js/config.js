@@ -9,14 +9,14 @@ window.RESTAURANT_CONFIG = {
   supabaseAnonKey: "sb_publishable_Xo8682M5p3MXB3EF7JHa3g_i6A9Jgrt",
   currency: "INR",
   currencySymbol: "₹",
-  defaultRestaurantName: "The Good Table",
+  defaultRestaurantName: "RK Food",
   defaultWhatsAppNumber: "919974285746"
 };
 
 window.db = null;
 if (window.supabase && window.RESTAURANT_CONFIG.supabaseUrl.startsWith("https://") &&
-    !window.RESTAURANT_CONFIG.supabaseUrl.includes("YOUR-PROJECT") &&
-    !window.RESTAURANT_CONFIG.supabaseAnonKey.includes("YOUR_SUPABASE")) {
+  !window.RESTAURANT_CONFIG.supabaseUrl.includes("YOUR-PROJECT") &&
+  !window.RESTAURANT_CONFIG.supabaseAnonKey.includes("YOUR_SUPABASE")) {
   window.db = window.supabase.createClient(
     window.RESTAURANT_CONFIG.supabaseUrl,
     window.RESTAURANT_CONFIG.supabaseAnonKey
