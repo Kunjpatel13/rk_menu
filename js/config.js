@@ -9,8 +9,8 @@ window.RESTAURANT_CONFIG = {
   supabaseAnonKey: "sb_publishable_Xo8682M5p3MXB3EF7JHa3g_i6A9Jgrt",
   currency: "INR",
   currencySymbol: "₹",
-  defaultRestaurantName: "RK Food",
-  defaultWhatsAppNumber: "919974285746"
+  defaultRestaurantName: "Radhe Krushna Food Zone",
+  defaultWhatsAppNumber: "919979678889"
 };
 
 window.db = null;

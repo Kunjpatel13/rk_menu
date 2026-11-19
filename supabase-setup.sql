@@ -24,6 +24,7 @@ create table if not exists public.menu_items (
   category_id uuid not null references public.categories(id) on delete restrict,
   description text not null default '',
   price numeric(10,2) not null check (price >= 0),
+  half_price numeric(10,2),
   image_url text,
   food_type text not null default 'Veg' check (food_type in ('Veg','Non-Veg')),
   is_available boolean not null default true,
@@ -41,6 +42,10 @@ create table if not exists public.restaurant_settings (
   opening_hours text not null default '',
   delivery_charge numeric(10,2) not null default 0 check (delivery_charge >= 0),
   minimum_order_amount numeric(10,2) not null default 0 check (minimum_order_amount >= 0),
+  discount_percent numeric(5,2) not null default 0 check (discount_percent >= 0 and discount_percent <= 100),
+  discount_note text not null default '',
+  upi_id text not null default '',
+  qr_image_url text not null default '',
   updated_at timestamptz not null default now()
 );
 

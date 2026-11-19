@@ -20,8 +20,8 @@
   <nav class="navbar sticky-top site-nav">
     <div class="container d-flex align-items-center justify-content-between">
       <a class="navbar-brand brand d-flex align-items-center gap-2 m-0" href="#">
-        <img src="img/RK food_logo_black.png" alt="RK Food" class="site-header-logo">
-        <span id="restaurantName" class="brand-text">RK Food</span>
+        <img src="img/RK food_logo_black.png" alt="Radhe Krushna Food Zone" class="site-header-logo">
+        <span id="restaurantName" class="brand-text">Radhe Krushna Food Zone</span>
       </a>
       <div class="nav-cart-wrap">
         <button class="btn btn-brand position-relative" id="navCartBtn" aria-label="View Cart">
@@ -50,24 +50,55 @@
       <div class="container">
         <div class="section-heading">
           <div><span class="eyebrow">WHAT SOUNDS GOOD?</span>
-            <h2>Explore our menu</h2>
-            <p>Find something delicious for every craving.</p>
+            <h2 id="menuSectionTitle">Explore our menu</h2>
+            <p id="menuSectionSubtitle">Select a category to view dishes.</p>
           </div>
           <div class="menu-search"><i class="bi bi-search"></i><input id="searchInput" type="search"
               placeholder="Search dishes..." aria-label="Search dishes"></div>
         </div>
-        <div class="filter-row" id="categoryFilters"><button class="filter-chip active" data-category="all">All
-            items</button></div>
-        <div class="row g-4 mt-2" id="menuGrid">
-          <div class="col-12 text-center py-5">
-            <div class="spinner-border text-warning"></div>
-            <p class="mt-3 text-muted">Loading delicious things...</p>
+        <div id="discountBanner" class="discount-banner d-none mb-3"><i class="bi bi-tag-fill me-2"></i><span
+            id="discountBannerText"></span></div>
+
+        <!-- VIEW 1: LANDING PAGE MAIN CATEGORY CARDS -->
+        <div id="mainCategoriesView">
+          <div class="row g-3 g-md-4 mt-1" id="categoryCardsGrid">
+            <div class="col-12 text-center py-5">
+              <div class="spinner-border text-warning"></div>
+              <p class="mt-3 text-muted">Loading delicious categories...</p>
+            </div>
           </div>
         </div>
-        <div id="menuEmpty" class="empty-state d-none"><i class="bi bi-search"></i>
-          <h3>No dishes found</h3>
-          <p>Try another search or category.</p>
+
+        <!-- VIEW 2: CATEGORY ITEMS & SUB-CATEGORIES -->
+        <div id="categoryItemsView" class="d-none">
+          <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom flex-wrap gap-2">
+            <button class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold" id="backToCategoriesBtn">
+              <i class="bi bi-arrow-left me-1"></i>All Categories
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-orange text-white fs-6 py-1 px-3 rounded-pill"
+                id="activeCategoryBadge">Category</span>
+              <span class="small text-muted" id="activeCategoryItemCount"></span>
+            </div>
+          </div>
+
+          <!-- Sub-Category Filter Chips -->
+          <div class="sub-filter-row mb-3 d-none" id="subCategoryFilters"></div>
+
+          <!-- Dishes Grid -->
+          <div class="row g-3 g-md-4 mt-1" id="menuGrid"></div>
+
+          <!-- Empty State -->
+          <div id="menuEmpty" class="empty-state d-none">
+            <i class="bi bi-search"></i>
+            <h3>No dishes found</h3>
+            <p>Try another search or select a different category.</p>
+            <button class="btn btn-outline-brand btn-sm mt-2" id="emptyBackBtn">
+              <i class="bi bi-arrow-left me-1"></i>Back to Categories
+            </button>
+          </div>
         </div>
+
         <div id="menuError" class="alert alert-warning d-none mt-4">Menu could not be loaded. Please check the
           Supabase setup and refresh.</div>
       </div>
@@ -78,8 +109,9 @@
     <div class="container py-5">
       <div class="row g-4">
         <div class="col-md-6"><a class="navbar-brand brand text-white d-inline-flex align-items-center" href="#"><img
-              src="img/RK food_logo_white.png" alt="RK Food" class="footer-logo me-2"><span id="footerRestaurantName">RK
-              Food</span></a>
+              src="img/RK food_logo_white.png" alt="Radhe Krushna Food Zone" class="footer-logo me-2"><span
+              id="footerRestaurantName">Radhe
+              Krushna Food Zone</span></a>
           <p class="footer-muted mt-3">Fresh food, warm hospitality and flavours worth coming back for.</p>
         </div>
         <div class="col-md-3">
@@ -92,7 +124,8 @@
           <p class="footer-muted" id="restaurantHours">Opening hours</p>
         </div>
       </div>
-      <div class="footer-bottom">© <span id="year"></span> <span id="footerNameBottom">RK Food</span>. All rights
+      <div class="footer-bottom">© <span id="year"></span> <span id="footerNameBottom">Radhe Krushna Food Zone</span>.
+        All rights
         reserved.</div>
     </div>
   </footer>
@@ -113,10 +146,13 @@
       <div class="cart-summary">
         <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><strong id="cartSubtotal">₹0</strong>
         </div>
+        <div class="d-flex justify-content-between text-success mb-2 d-none" id="cartDiscountRow"><span
+            id="cartDiscountLabel">Discount</span><strong id="cartDiscount">-₹0</strong></div>
         <div class="d-flex justify-content-between mb-3"><span>Delivery</span><strong id="cartDelivery">₹0</strong>
         </div>
         <div class="d-flex justify-content-between cart-total"><span>Total</span><strong id="cartTotal">₹0</strong>
         </div>
+        <div id="cartDiscountNote" class="small text-success mt-1 d-none"></div>
         <button class="btn btn-brand w-100 mt-3" id="checkoutBtn">Continue to checkout <i
             class="bi bi-arrow-right ms-2"></i></button>
         <small class="text-muted d-block mt-2">Final order is sent to the restaurant through WhatsApp.</small>
@@ -160,6 +196,27 @@
             <div class="checkout-disclaimer mt-4"><i class="bi bi-shield-check me-2"></i>Your details and order
               summary will be transferred to the restaurant's WhatsApp chat. You must press Send in WhatsApp to
               submit the order.</div>
+
+            <!-- BOLD COD AVAILABLE BANNER -->
+            <div class="cod-banner my-3 p-3 rounded-3 text-center">
+              <i class="bi bi-cash-stack me-2 fs-5"></i>
+              <strong class="d-inline-block fs-6">CASH ON DELIVERY (COD) IS AVAILABLE!</strong>
+              <div class="small mt-1 text-muted">You can pay with cash or scan QR when your order is delivered.</div>
+            </div>
+
+            <!-- PAYMENT QR CODE BOX -->
+            <div class="payment-qr-card my-3 p-3 text-center border rounded-3 bg-light" id="paymentQrBox">
+              <div class="fw-bold mb-1 text-dark"><i class="bi bi-qr-code-scan me-1 text-orange"></i>Pay Online via UPI
+                QR Code</div>
+              <div class="small text-muted mb-2">Google Pay · PhonePe · Paytm · BHIM · Any UPI App</div>
+              <div class="qr-wrapper d-inline-block p-2 bg-white rounded-3 shadow-sm border mb-2">
+                <img id="checkoutQrImg" src="" alt="UPI Payment QR Code"
+                  style="width: 160px; height: 160px; object-fit: contain;">
+              </div>
+              <div class="small text-muted">UPI ID: <strong id="checkoutUpiIdText"></strong></div>
+              <div class="small fw-bold text-success mt-1" id="checkoutQrAmount"></div>
+            </div>
+
             <div class="order-review mt-4" id="checkoutReview"></div>
             <button class="btn btn-brand w-100 mt-4" type="submit"><i class="bi bi-whatsapp me-2"></i>Continue to
               WhatsApp</button>
@@ -170,8 +227,8 @@
   </div>
   <div class="toast-container position-fixed bottom-0 end-0 p-3" id="siteToastContainer">
     <div id="siteToast" class="toast" role="status">
-      <div class="toast-body"><i class="bi bi-check-circle-fill text-success me-2"></i><span
-          id="toastMessage">Added to cart</span></div>
+      <div class="toast-body"><i class="bi bi-check-circle-fill text-success me-2"></i><span id="toastMessage">Added to
+          cart</span></div>
     </div>
   </div>
 
