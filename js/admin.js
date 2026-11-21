@@ -2,9 +2,21 @@
   const $ = id => document.getElementById(id);
   const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = n => `₹${Number(n || 0).toFixed(0)}`;
-  let adminUser, menu = [], categories = [], settings = {}, editingImageUrl = '';
+  let adminUser, menu = [], categories = [], settings = {}, editingImageUrl = '', editingCategoryImageUrl = '';
   const modal = $('itemModal') ? bootstrap.Modal.getOrCreateInstance($('itemModal')) : null;
   const bulkModal = $('bulkItemModal') ? bootstrap.Modal.getOrCreateInstance($('bulkItemModal')) : null;
+  const categoryModal = $('categoryModal') ? bootstrap.Modal.getOrCreateInstance($('categoryModal')) : null;
+
+  const DEFAULT_CATEGORY_IMAGES = {
+    'Kathiyawadi & Gujarati Food': '../img/Kathiyawadi & Gujarati Food.avif',
+    'Indian Sabji & Curry': '../img/Indian Sabji & Curry.jfif',
+    'Rice, Pulao & Biryani': '../img/Rice, Pulao & Biryani.avif',
+    'Chinese Food': '../img/Chinese Food.jfif',
+    'Starters': '../img/Starters.jpg',
+    'Roti, Bhakhri & Paratha': '../img/Roti, Bhakhri & Paratha.jpeg',
+    'Snacks, Fast Food & Quick Bites': '../img/Snacks, Fast Food & Quick Bites.webp',
+    'Thali, Kadhi-Khichdi & Beverages': '../img/Fix Thali.jfif'
+  };
 
   function notice(message, bad = false) {
     const el = $('adminNotice');
@@ -238,13 +250,20 @@
     mains.forEach(main => {
       const subs = categories.filter(c => c.parent_id === main.id);
       const mainDishCount = menu.filter(m => m.category_id === main.id || subs.some(s => s.id === m.category_id)).length;
+      const displayImg = (main.image_url && main.image_url.trim()) ? main.image_url.trim() : (DEFAULT_CATEGORY_IMAGES[main.name] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80');
 
       treeHtml += `
         <div class="category-tree-main">
           <div class="category-tree-main-title">
-            <span><strong>📁 ${escapeHtml(main.name)}</strong> <span class="badge bg-secondary-subtle text-dark border ms-2">${mainDishCount} dishes</span></span>
-            <div>
-              <button class="btn btn-sm btn-light" data-rename="${main.id}" title="Rename"><i class="bi bi-pencil"></i></button>
+            <div class="d-flex align-items-center gap-3">
+              <img src="${escapeHtml(displayImg)}" alt="" class="category-thumb" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80'">
+              <div>
+                <strong>${escapeHtml(main.name)}</strong>
+                <span class="badge bg-secondary-subtle text-dark border ms-2">${mainDishCount} dishes</span>
+              </div>
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-light" data-editcat="${main.id}" title="Edit category name & image"><i class="bi bi-pencil me-1"></i>Edit</button>
               <button class="btn btn-sm btn-light text-danger" data-delcat="${main.id}" title="Delete"><i class="bi bi-trash"></i></button>
             </div>
           </div>
@@ -256,7 +275,7 @@
                   <div class="category-tree-sub-item">
                     <span>&bull; ${escapeHtml(s.name)} <small class="text-muted">(${subDishCount} dishes)</small></span>
                     <div>
-                      <button class="btn btn-sm btn-light" data-rename="${s.id}" title="Rename"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm btn-light" data-editcat="${s.id}" title="Edit"><i class="bi bi-pencil"></i></button>
                       <button class="btn btn-sm btn-light text-danger" data-delcat="${s.id}" title="Delete"><i class="bi bi-trash"></i></button>
                     </div>
                   </div>
@@ -277,7 +296,7 @@
           <div class="category-row">
             <span>${escapeHtml(o.name)}</span>
             <div>
-              <button class="btn btn-sm btn-light" data-rename="${o.id}"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-light" data-editcat="${o.id}"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-sm btn-light text-danger" data-delcat="${o.id}"><i class="bi bi-trash"></i></button>
             </div>
           </div>
@@ -286,7 +305,7 @@
     }
 
     listEl.innerHTML = treeHtml;
-    listEl.querySelectorAll('[data-rename]').forEach(b => b.addEventListener('click', () => renameCategory(b.dataset.rename)));
+    listEl.querySelectorAll('[data-editcat]').forEach(b => b.addEventListener('click', () => openEditCategory(b.dataset.editcat)));
     listEl.querySelectorAll('[data-delcat]').forEach(b => b.addEventListener('click', () => deleteCategory(b.dataset.delcat)));
   }
 
@@ -473,7 +492,167 @@
     else { await loadAll(); notice('Menu item deleted.'); }
   }
 
-  $('categoryForm').addEventListener('submit', async e => {
+  /* ========================================================
+     CATEGORY MODAL (ADD & EDIT WITH IMAGE)
+  ======================================================== */
+  function updateCategoryImagePreview(url, sourceLabel = 'Image selected') {
+    const container = $('categoryImagePreviewContainer');
+    const img = $('categoryImagePreview');
+    const sourceText = $('categoryPreviewSourceText');
+    const urlText = $('categoryPreviewUrlText');
+    if (!container || !img) return;
+
+    if (url && url.trim()) {
+      img.src = url.trim();
+      img.onerror = () => {
+        img.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80';
+        if (urlText) urlText.textContent = 'Invalid URL or could not load image';
+      };
+      if (sourceText) sourceText.textContent = sourceLabel;
+      if (urlText) urlText.textContent = url.trim();
+      container.classList.remove('d-none');
+    } else {
+      img.src = '';
+      container.classList.add('d-none');
+      if (urlText) urlText.textContent = '';
+    }
+  }
+
+  function populateCategoryEditParent(currentId = null, selectedParentId = '') {
+    const sel = $('categoryEditParent');
+    if (!sel) return;
+    const mains = categories.filter(c => !c.parent_id && c.id !== currentId);
+    sel.innerHTML = `<option value="">-- Main Category (Root) --</option>` +
+      mains.map(m => `<option value="${m.id}" ${m.id === selectedParentId ? 'selected' : ''}>Sub-category of: ${escapeHtml(m.name)}</option>`).join('');
+    if (selectedParentId) sel.value = selectedParentId;
+  }
+
+  function openAddCategory() {
+    if ($('categoryModalForm')) $('categoryModalForm').reset();
+    $('categoryEditId').value = '';
+    editingCategoryImageUrl = '';
+    if ($('categoryEditImageUrl')) $('categoryEditImageUrl').value = '';
+    if ($('categoryEditImageFile')) $('categoryEditImageFile').value = '';
+    updateCategoryImagePreview('');
+    populateCategoryEditParent(null, '');
+    if ($('categoryModalTitle')) $('categoryModalTitle').textContent = 'Add new category';
+    if (categoryModal) categoryModal.show();
+  }
+
+  function openEditCategory(id) {
+    const c = categories.find(x => x.id === id);
+    if (!c) return;
+    if ($('categoryModalForm')) $('categoryModalForm').reset();
+    $('categoryEditId').value = c.id;
+    $('categoryEditName').value = c.name;
+    editingCategoryImageUrl = c.image_url || '';
+    if ($('categoryEditImageUrl')) $('categoryEditImageUrl').value = editingCategoryImageUrl;
+    if ($('categoryEditImageFile')) $('categoryEditImageFile').value = '';
+    updateCategoryImagePreview(editingCategoryImageUrl, editingCategoryImageUrl ? 'Current Saved Image' : '');
+    populateCategoryEditParent(c.id, c.parent_id || '');
+    if ($('categoryModalTitle')) $('categoryModalTitle').textContent = c.parent_id ? 'Edit sub-category' : 'Edit main category & image';
+    if (categoryModal) categoryModal.show();
+  }
+
+  $('categoryModalForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = $('saveCategoryModalBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    try {
+      const name = $('categoryEditName').value.trim();
+      if (!name) throw new Error('Category name is required.');
+      const parentId = $('categoryEditParent').value || null;
+      const file = $('categoryEditImageFile')?.files?.[0];
+      const onlineUrl = $('categoryEditImageUrl')?.value?.trim();
+
+      let finalImg = null;
+      if (file) {
+        finalImg = await uploadImage(file);
+      } else if (onlineUrl) {
+        finalImg = onlineUrl;
+      } else if (editingCategoryImageUrl) {
+        finalImg = editingCategoryImageUrl;
+      }
+
+      const id = $('categoryEditId').value;
+      const payload = {
+        name,
+        parent_id: parentId,
+        image_url: finalImg || null
+      };
+
+      let result;
+      if (id) {
+        result = await db.from('categories').update(payload).eq('id', id);
+      } else {
+        payload.sort_order = categories.length + 1;
+        payload.is_active = true;
+        result = await db.from('categories').insert(payload);
+      }
+
+      if (result.error) {
+        if (result.error.message && result.error.message.includes('image_url')) {
+          delete payload.image_url;
+          result = id ? await db.from('categories').update(payload).eq('id', id) : await db.from('categories').insert(payload);
+          if (result.error) throw result.error;
+          notice('Category saved! Notice: Run migration-category-image.sql in Supabase to enable category images.', true);
+        } else {
+          throw result.error;
+        }
+      } else {
+        notice(id ? 'Category updated.' : 'Category added.');
+      }
+
+      if (categoryModal) categoryModal.hide();
+      await loadAll();
+    } catch (err) {
+      notice(err.message || 'Could not save category.', true);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save category'; }
+    }
+  });
+
+  if ($('categoryEditImageUrl')) {
+    $('categoryEditImageUrl').addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      if (val) {
+        if ($('categoryEditImageFile')) $('categoryEditImageFile').value = '';
+        updateCategoryImagePreview(val, 'Online Image Link');
+      } else {
+        updateCategoryImagePreview('');
+      }
+    });
+  }
+
+  if ($('categoryEditImageFile')) {
+    $('categoryEditImageFile').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if ($('categoryEditImageUrl')) $('categoryEditImageUrl').value = '';
+        const localUrl = URL.createObjectURL(file);
+        updateCategoryImagePreview(localUrl, `Uploaded: ${file.name}`);
+      } else {
+        const urlVal = $('categoryEditImageUrl') ? $('categoryEditImageUrl').value.trim() : '';
+        updateCategoryImagePreview(urlVal, urlVal ? 'Online Image Link' : '');
+      }
+    });
+  }
+
+  if ($('removeCategoryImageBtn')) {
+    $('removeCategoryImageBtn').addEventListener('click', () => {
+      if ($('categoryEditImageUrl')) $('categoryEditImageUrl').value = '';
+      if ($('categoryEditImageFile')) $('categoryEditImageFile').value = '';
+      editingCategoryImageUrl = '';
+      updateCategoryImagePreview('');
+    });
+  }
+
+  if ($('openAddCategoryBtn')) {
+    $('openAddCategoryBtn').addEventListener('click', openAddCategory);
+  }
+
+  $('categoryForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     const name = $('categoryName').value.trim();
     if (!name) return;
@@ -495,15 +674,6 @@
       notice('Category added.');
     }
   });
-
-  async function renameCategory(id) {
-    const c = categories.find(x => x.id === id);
-    const name = prompt('New category name:', c?.name || '');
-    if (!name?.trim()) return;
-    const { error } = await db.from('categories').update({ name: name.trim() }).eq('id', id);
-    if (error) notice(error.message, true);
-    else { await loadAll(); notice('Category updated.'); }
-  }
 
   async function deleteCategory(id) {
     const c = categories.find(x => x.id === id);

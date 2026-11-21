@@ -19,10 +19,16 @@
 <body>
   <nav class="navbar sticky-top site-nav">
     <div class="container d-flex align-items-center justify-content-between">
-      <a class="navbar-brand brand d-flex align-items-center gap-2 m-0" href="#">
-        <img src="img/RK food_logo_black.png" alt="Radhe Krushna Food Zone" class="site-header-logo">
-        <span id="restaurantName" class="brand-text">Radhe Krushna Food Zone</span>
-      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a class="navbar-brand brand d-flex align-items-center gap-2 m-0" href="#">
+          <img src="img/RK food_logo_black.png" alt="Radhe Krushna Food Zone" class="site-header-logo">
+          <span id="restaurantName" class="brand-text">Radhe Krushna Food Zone</span>
+        </a>
+        <div class="live-pill ms-1" title="Accepting online WhatsApp orders">
+          <span class="live-pulse-dot"></span>
+          <span class="live-text">LIVE</span>
+        </div>
+      </div>
       <div class="nav-cart-wrap">
         <button class="btn btn-brand position-relative" id="navCartBtn" aria-label="View Cart">
           <i class="bi bi-bag me-1"></i><span class="d-none d-sm-inline">Cart</span> <span class="cart-count"
@@ -34,13 +40,33 @@
 
   <header class="hero" id="home">
     <div class="container">
-      <div class="hero-copy">
-        <span class="eyebrow"><i class="bi bi-stars me-2"></i>GOOD FOOD. GOOD MOOD.</span>
-        <h1>Made fresh.<br><em>Served with love.</em></h1>
-        <p>Discover delicious favourites, prepared fresh and ready for your table.</p>
-        <a class="btn btn-brand btn-lg" href="#menu">Explore the menu <i class="bi bi-arrow-down-right ms-2"></i></a>
-        <div class="hero-note"><i class="bi bi-clock me-2"></i><span id="openingHours">Open daily · Update hours
-            in restaurant settings</span></div>
+      <div class="hero-info-bar">
+        <div class="hero-info-item">
+          <div class="hero-info-icon"><i class="bi bi-clock-fill"></i></div>
+          <div class="hero-info-text">
+            <span class="hero-info-label">Timing</span>
+            <strong id="openingHours">Daily · 11:00 AM – 11:00 PM</strong>
+          </div>
+        </div>
+        <div class="hero-info-divider d-none d-md-block"></div>
+        <div class="hero-info-item">
+          <div class="hero-info-icon"><i class="bi bi-geo-alt-fill"></i></div>
+          <div class="hero-info-text">
+            <span class="hero-info-label">Location</span>
+            <strong id="heroAddress">AB-3, Mile Stone, Anand Vidhyanagar Road, Anand</strong>
+          </div>
+        </div>
+        <div class="hero-info-divider d-none d-lg-block"></div>
+        <div class="hero-info-item hero-info-live">
+          <div class="hero-info-icon hero-info-live-icon">
+            <span class="live-radar-wave"></span>
+            <i class="bi bi-broadcast"></i>
+          </div>
+          <div class="hero-info-text">
+            <span class="hero-info-label text-success">Live Ordering</span>
+            <strong id="liveStatusText" class="live-status-highlight"><span class="text-success"><i class="bi bi-circle-fill live-dot-inline me-1"></i>Accepting Orders Live</span> · Instant WhatsApp Dispatch</strong>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -104,31 +130,6 @@
       </div>
     </section>
   </main>
-
-  <footer id="contact" class="site-footer">
-    <div class="container py-5">
-      <div class="row g-4">
-        <div class="col-md-6"><a class="navbar-brand brand text-white d-inline-flex align-items-center" href="#"><img
-              src="img/RK food_logo_white.png" alt="Radhe Krushna Food Zone" class="footer-logo me-2"><span
-              id="footerRestaurantName">Radhe
-              Krushna Food Zone</span></a>
-          <p class="footer-muted mt-3">Fresh food, warm hospitality and flavours worth coming back for.</p>
-        </div>
-        <div class="col-md-3">
-          <h6>Visit us</h6>
-          <p class="footer-muted" id="restaurantAddress">Add your restaurant address in admin settings.</p>
-        </div>
-        <div class="col-md-3">
-          <h6>Get in touch</h6>
-          <p class="footer-muted" id="restaurantPhone">Add your contact number in admin settings.</p>
-          <p class="footer-muted" id="restaurantHours">Opening hours</p>
-        </div>
-      </div>
-      <div class="footer-bottom">© <span id="year"></span> <span id="footerNameBottom">Radhe Krushna Food Zone</span>.
-        All rights
-        reserved.</div>
-    </div>
-  </footer>
 
   <div class="mobile-cart-bar d-none" id="mobileCartBar">
     <div><strong id="mobileCartItems">0 items</strong><small id="mobileCartTotal">₹0</small></div><button

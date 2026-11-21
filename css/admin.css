@@ -1165,6 +1165,15 @@
     justify-content: space-between;
 }
 
+.category-thumb {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e7ded3;
+    flex-shrink: 0;
+}
+
 .category-tree-sub-list {
     padding-left: 20px;
     margin-top: 8px;
