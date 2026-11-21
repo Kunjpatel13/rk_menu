@@ -7,6 +7,7 @@
 -- 1. Schema migration: Ensure parent_id and extra columns exist in categories and settings
 alter table public.categories add column if not exists parent_id uuid references public.categories(id) on delete cascade;
 alter table public.categories alter column parent_id drop not null;
+alter table public.categories add column if not exists image_url text;
 alter table public.menu_items add column if not exists half_price numeric(10,2);
 alter table public.restaurant_settings add column if not exists discount_percent numeric(5,2) default 0;
 alter table public.restaurant_settings add column if not exists discount_note text default '';
@@ -45,15 +46,15 @@ delete from public.menu_items;
 delete from public.categories;
 
 -- 4. Insert 8 Main Categories (parent_id is null)
-insert into public.categories (id, name, parent_id, sort_order, is_active) values
-  ('10000000-0000-0000-0000-000000000001'::uuid, 'Kathiyawadi & Gujarati Food', null, 1, true),
-  ('10000000-0000-0000-0000-000000000002'::uuid, 'Indian Sabji & Curry', null, 2, true),
-  ('10000000-0000-0000-0000-000000000003'::uuid, 'Rice, Pulao & Biryani', null, 3, true),
-  ('10000000-0000-0000-0000-000000000004'::uuid, 'Chinese Food', null, 4, true),
-  ('10000000-0000-0000-0000-000000000005'::uuid, 'Starters', null, 5, true),
-  ('10000000-0000-0000-0000-000000000006'::uuid, 'Roti, Bhakhri & Paratha', null, 6, true),
-  ('10000000-0000-0000-0000-000000000007'::uuid, 'Snacks, Fast Food & Quick Bites', null, 7, true),
-  ('10000000-0000-0000-0000-000000000008'::uuid, 'Thali, Kadhi-Khichdi & Beverages', null, 8, true);
+insert into public.categories (id, name, parent_id, sort_order, is_active, image_url) values
+  ('10000000-0000-0000-0000-000000000001'::uuid, 'Kathiyawadi & Gujarati Food', null, 1, true, 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000002'::uuid, 'Indian Sabji & Curry', null, 2, true, 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000003'::uuid, 'Rice, Pulao & Biryani', null, 3, true, 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000004'::uuid, 'Chinese Food', null, 4, true, 'https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000005'::uuid, 'Starters', null, 5, true, 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000006'::uuid, 'Roti, Bhakhri & Paratha', null, 6, true, 'https://images.unsplash.com/photo-1626074353765-517a681e40be?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000007'::uuid, 'Snacks, Fast Food & Quick Bites', null, 7, true, 'https://images.unsplash.com/photo-1576107232684-1279f3908594?auto=format&fit=crop&w=700&q=80'),
+  ('10000000-0000-0000-0000-000000000008'::uuid, 'Thali, Kadhi-Khichdi & Beverages', null, 8, true, 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=700&q=80');
 
 -- 5. Insert Sub Categories (linked to parent Main Categories)
 insert into public.categories (id, name, parent_id, sort_order, is_active) values

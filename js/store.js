@@ -5,14 +5,14 @@
   const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const MAIN_CATEGORY_IMAGES = {
-    'Kathiyawadi & Gujarati Food': 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=700&q=80',
-    'Indian Sabji & Curry': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=700&q=80',
-    'Rice, Pulao & Biryani': 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=700&q=80',
-    'Chinese Food': 'https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?auto=format&fit=crop&w=700&q=80',
-    'Starters': 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=700&q=80',
-    'Roti, Bhakhri & Paratha': 'https://images.unsplash.com/photo-1626074353765-517a681e40be?auto=format&fit=crop&w=700&q=80',
-    'Snacks, Fast Food & Quick Bites': 'https://images.unsplash.com/photo-1576107232684-1279f3908594?auto=format&fit=crop&w=700&q=80',
-    'Thali, Kadhi-Khichdi & Beverages': 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=700&q=80'
+    'Kathiyawadi & Gujarati Food': 'img/Kathiyawadi & Gujarati Food.avif',
+    'Indian Sabji & Curry': 'img/Indian Sabji & Curry.jfif',
+    'Rice, Pulao & Biryani': 'img/Rice, Pulao & Biryani.avif',
+    'Chinese Food': 'img/Chinese Food.jfif',
+    'Starters': 'img/Starters.jpg',
+    'Roti, Bhakhri & Paratha': 'img/Roti, Bhakhri & Paratha.jpeg',
+    'Snacks, Fast Food & Quick Bites': 'img/Snacks, Fast Food & Quick Bites.webp',
+    'Thali, Kadhi-Khichdi & Beverages': 'img/Fix Thali.jfif'
   };
 
   let menu = [], categories = [], settings = {}, cart = JSON.parse(localStorage.getItem('restaurant_cart') || '{}');
@@ -89,7 +89,7 @@
       const subs = categories.filter(c => c.parent_id === main.id);
       const subNames = subs.map(s => s.name).join(' · ');
       const count = getCategoryItemCount(main.id);
-      const img = MAIN_CATEGORY_IMAGES[main.name] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=700&q=80';
+      const img = (main.image_url && main.image_url.trim()) ? main.image_url.trim() : (MAIN_CATEGORY_IMAGES[main.name] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=700&q=80');
 
       const col = document.createElement('div');
       col.className = 'col-6 col-md-4 col-xl-3';
@@ -440,6 +440,36 @@
     saveCart();
   }
 
+  function updateLiveStatus() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const timeMin = h * 60 + m;
+    // Opening hours: 11:00 AM (660 mins) to 11:00 PM (1380 mins)
+    const isOpen = (timeMin >= 660 && timeMin < 1380);
+
+    const statusEl = $('liveStatusText');
+    const navPill = document.querySelector('.live-pill');
+
+    if (isOpen) {
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="text-success"><i class="bi bi-circle-fill live-dot-inline me-1"></i>Accepting Orders Live</span> · Instant WhatsApp Dispatch';
+      }
+      if (navPill) {
+        navPill.classList.remove('closed');
+        navPill.title = 'Kitchen Open · Accepting WhatsApp orders';
+      }
+    } else {
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="text-warning"><i class="bi bi-clock-history me-1"></i>Pre-Orders Open</span> · Kitchen opens at 11:00 AM';
+      }
+      if (navPill) {
+        navPill.classList.add('closed');
+        navPill.title = 'Pre-orders open for 11:00 AM';
+      }
+    }
+  }
+
   function renderCart() {
     const rows = cartRows(), holder = $('cartItems');
     const count = cartCount();
@@ -447,7 +477,16 @@
     const disc = discountAmount();
     const tot = total();
 
-    if ($('cartCount')) $('cartCount').textContent = count;
+    const cb = $('cartCount');
+    if (cb) {
+      const prev = parseInt(cb.textContent || '0', 10);
+      cb.textContent = count;
+      if (count !== prev) {
+        cb.classList.remove('cart-bump');
+        void cb.offsetWidth;
+        cb.classList.add('cart-bump');
+      }
+    }
     if ($('mobileCartItems')) $('mobileCartItems').textContent = `${count} item${count === 1 ? '' : 's'}`;
     if ($('mobileCartTotal')) $('mobileCartTotal').textContent = money(tot);
 
@@ -709,12 +748,9 @@
 
     const name = settings.restaurant_name || cfg.defaultRestaurantName;
     if ($('restaurantName')) $('restaurantName').textContent = name;
-    if ($('footerRestaurantName')) $('footerRestaurantName').textContent = name;
-    if ($('footerNameBottom')) $('footerNameBottom').textContent = name;
     if ($('openingHours')) $('openingHours').textContent = settings.opening_hours || 'Fresh food · Made with love';
-    if ($('restaurantAddress')) $('restaurantAddress').textContent = settings.address || 'Add your restaurant address in admin settings.';
-    if ($('restaurantPhone')) $('restaurantPhone').textContent = settings.contact_phone || 'Contact details';
-    if ($('restaurantHours')) $('restaurantHours').textContent = settings.opening_hours || '';
+    if ($('heroAddress')) $('heroAddress').textContent = settings.address || 'AB-3, Mile Stone, Anand Vidhyanagar Road, Anand - 388 001';
+    updateLiveStatus();
 
     // Offer banner
     const discBanner = $('discountBanner');
@@ -779,15 +815,26 @@
   });
 
   $('checkoutBtn').addEventListener('click', showCheckout);
-  if ($('year')) $('year').textContent = new Date().getFullYear();
 
   renderCart();
+  updateLiveStatus();
+  setInterval(updateLiveStatus, 30000);
+
   loadData().then(() => {
     if (window.db) {
       db.channel('public-menu-live')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, loadData)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, loadData)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_settings' }, loadData)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => {
+          loadData();
+          updateLiveStatus();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+          loadData();
+          updateLiveStatus();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_settings' }, () => {
+          loadData();
+          updateLiveStatus();
+        })
         .subscribe();
     }
   });
