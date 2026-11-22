@@ -954,8 +954,8 @@
       `*NEW RESTAURANT ORDER*`,
       `Order ID: ${orderId}`,
       `Date: ${displayDate}`,
-      '------------------------------',
       '',
+      '------------------------------',
       '*CUSTOMER DETAILS*',
       `Name: ${$('customerName').value.trim()}`,
       `Phone: ${phone}`,
@@ -968,12 +968,11 @@
     }
 
     messageLines.push(
-      '------------------------------',
       '',
       '*ORDER ITEMS*',
       lines,
-      '------------------------------',
       '',
+      '------------------------------',
       '*PAYMENT SUMMARY*',
       `Subtotal: ${money(subtotal())}`
     );
@@ -987,15 +986,12 @@
     messageLines.push(
       `Delivery: ${money(delivery())}`,
       `*GRAND TOTAL: ${money(amount)}*`,
+      '',
       '------------------------------',
-      '',
-      '*PAYMENT & DELIVERY*',
-      `*CASH ON DELIVERY (COD) IS AVAILABLE!*`,
-      `Pay via UPI ID: ${upiId}`,
-      `👉 Tap to Pay (₹${amount}) in UPI App:`,
-      `${qrLink}`,
-      '',
-      `Direct UPI Link: ${upiUri}`,
+      '*PAYMENT*',
+      `CASH ON DELIVERY (COD) IS AVAILABLE!`,
+      '*OR*',
+      `Pay Now ${upiUri}`,
       '',
       'Please confirm this order.'
     );
