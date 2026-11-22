@@ -48,6 +48,10 @@ create table if not exists public.restaurant_settings (
   discount_note text not null default '',
   upi_id text not null default '',
   qr_image_url text not null default '',
+  open_time text not null default '11:00',
+  close_time text not null default '23:00',
+  store_status text not null default 'auto',
+  closed_message text not null default 'Restaurant is closed right now. We accept orders from 11:00 AM to 11:00 PM.',
   updated_at timestamptz not null default now()
 );
 

@@ -321,6 +321,10 @@
     if ($('settingDiscountNote')) $('settingDiscountNote').value = settings.discount_note || '';
     if ($('settingUpiId')) $('settingUpiId').value = settings.upi_id || '';
     if ($('settingQrImage')) $('settingQrImage').value = settings.qr_image_url || '';
+    if ($('settingStoreStatus')) $('settingStoreStatus').value = settings.store_status || 'auto';
+    if ($('settingOpenTime')) $('settingOpenTime').value = settings.open_time || '11:00';
+    if ($('settingCloseTime')) $('settingCloseTime').value = settings.close_time || '23:00';
+    if ($('settingClosedMessage')) $('settingClosedMessage').value = settings.closed_message || '';
   }
 
   function updateImagePreview(url, sourceLabel = 'Image selected') {
@@ -896,11 +900,23 @@
       discount_percent: $('settingDiscount') ? Number($('settingDiscount').value || 0) : 0,
       discount_note: $('settingDiscountNote') ? $('settingDiscountNote').value.trim() : '',
       upi_id: $('settingUpiId') ? $('settingUpiId').value.trim() : '',
-      qr_image_url: $('settingQrImage') ? $('settingQrImage').value.trim() : ''
+      qr_image_url: $('settingQrImage') ? $('settingQrImage').value.trim() : '',
+      store_status: $('settingStoreStatus') ? $('settingStoreStatus').value : 'auto',
+      open_time: $('settingOpenTime') ? $('settingOpenTime').value.trim() : '11:00',
+      close_time: $('settingCloseTime') ? $('settingCloseTime').value.trim() : '23:00',
+      closed_message: $('settingClosedMessage') ? $('settingClosedMessage').value.trim() : ''
     };
     if (!/^\d{10,15}$/.test(payload.whatsapp_number)) return notice('Enter WhatsApp number with country code, e.g. 919876543210.', true);
     let { error } = await db.from('restaurant_settings').upsert(payload);
-    if (error && error.message && (error.message.includes('discount') || error.message.includes('upi') || error.message.includes('qr'))) {
+    if (error && error.message && (
+      error.message.includes('discount') || 
+      error.message.includes('upi') || 
+      error.message.includes('qr') || 
+      error.message.includes('open_time') || 
+      error.message.includes('close_time') || 
+      error.message.includes('store_status') || 
+      error.message.includes('closed_message')
+    )) {
       const fallbackPayload = {
         id: 1,
         restaurant_name: payload.restaurant_name,
@@ -913,7 +929,7 @@
       };
       const retry = await db.from('restaurant_settings').upsert(fallbackPayload);
       if (retry.error) return notice(retry.error.message, true);
-      notice('Settings saved! Notice: Run migration-half-price-discount-qr.sql in Supabase to enable Discount & UPI columns.', true);
+      notice('Core settings saved! Run migration-store-timing.sql in Supabase to enable Store Timing & Status columns.', true);
       await loadAll();
       return;
     }

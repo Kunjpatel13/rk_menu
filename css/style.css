@@ -137,9 +137,9 @@ h2 {
 }
 
 .live-pill.closed {
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.35);
-  color: #d97706;
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #dc2626;
 }
 
 .live-pulse-dot {
@@ -153,9 +153,9 @@ h2 {
 }
 
 .live-pill.closed .live-pulse-dot {
-  background-color: #f59e0b;
-  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-  animation: livePulseAmberAnim 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+  background-color: #dc2626;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  animation: livePulseRedAnim 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
 }
 
 @keyframes livePulseAnim {
@@ -170,16 +170,66 @@ h2 {
   }
 }
 
-@keyframes livePulseAmberAnim {
+@keyframes livePulseRedAnim {
   0% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.75);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.75);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
   }
+}
+
+/* Store Closed Alert Banners & Notices */
+.store-closed-banner {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
+}
+
+.closed-banner-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.closed-title {
+  color: #991b1b;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.closed-subtitle {
+  color: #b91c1c;
+}
+
+.cart-closed-box {
+  background: #fff1f2;
+  border: 1.5px dashed #f43f5e;
+  color: #881337;
+}
+
+.closed-modal-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #fee2e2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  font-size: 2.3rem;
+  margin-bottom: 6px;
 }
 
 /* Hero Info Bar (Time & Location & Live Status) */
@@ -294,7 +344,7 @@ h2 {
 
 /* Menu Section */
 .section-space {
-  padding-top: 40px;
+  padding-top: 28px;
   padding-bottom: 110px;
 }
 

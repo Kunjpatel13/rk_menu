@@ -13,6 +13,10 @@ alter table public.restaurant_settings add column if not exists discount_percent
 alter table public.restaurant_settings add column if not exists discount_note text default '';
 alter table public.restaurant_settings add column if not exists upi_id text default '';
 alter table public.restaurant_settings add column if not exists qr_image_url text default '';
+alter table public.restaurant_settings add column if not exists open_time text default '11:00';
+alter table public.restaurant_settings add column if not exists close_time text default '23:00';
+alter table public.restaurant_settings add column if not exists store_status text default 'auto';
+alter table public.restaurant_settings add column if not exists closed_message text default 'Restaurant is closed right now. We accept orders from 11:00 AM to 11:00 PM.';
 
 -- Remove restrictive unique constraint on name if present so subcategories can be named freely
 alter table public.categories drop constraint if exists categories_name_key;

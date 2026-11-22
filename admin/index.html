@@ -216,6 +216,36 @@
                                 <input class="form-control" id="settingMinimum" type="number" min="0" step="1">
                             </div>
 
+                            <!-- STORE TIMING & ORDERING CONTROL -->
+                            <div class="col-12 pt-2 border-top">
+                                <span class="eyebrow text-primary"><i class="bi bi-clock-history me-1"></i>STORE TIMING &amp; ORDERING CONTROL</span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Ordering Status</label>
+                                <select class="form-select" id="settingStoreStatus">
+                                    <option value="auto">Automatic (By Operating Hours)</option>
+                                    <option value="open">Open (Always Accept Orders)</option>
+                                    <option value="closed">Closed (Stop Taking Orders Now)</option>
+                                </select>
+                                <small class="text-muted">Choose automatic hours or force open/close.</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Opening Time</label>
+                                <input class="form-control" type="time" id="settingOpenTime" value="11:00">
+                                <small class="text-muted">Daily start time for orders.</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Closing Time</label>
+                                <input class="form-control" type="time" id="settingCloseTime" value="23:00">
+                                <small class="text-muted">Daily closing time for orders.</small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Custom Closed Message (Optional)</label>
+                                <input class="form-control" id="settingClosedMessage"
+                                    placeholder="e.g. Restaurant is closed right now. We accept orders from 11:00 AM to 11:00 PM.">
+                                <small class="text-muted">Message shown to customers before checkout when closed.</small>
+                            </div>
+
                             <!-- DISCOUNT SETTINGS -->
                             <div class="col-12 pt-2 border-top">
                                 <span class="eyebrow text-success"><i class="bi bi-tag-fill me-1"></i>DISCOUNT &amp;

@@ -21,6 +21,7 @@
 
   const cartCanvas = bootstrap.Offcanvas.getOrCreateInstance($('cartCanvas'));
   const checkoutModal = bootstrap.Modal.getOrCreateInstance($('checkoutModal'));
+  const storeClosedModal = $('storeClosedModal') ? bootstrap.Modal.getOrCreateInstance($('storeClosedModal')) : null;
   const toast = bootstrap.Toast.getOrCreateInstance($('siteToast'), { delay: 1600 });
 
   function notify(message) {
@@ -440,32 +441,93 @@
     saveCart();
   }
 
-  function updateLiveStatus() {
+  function isStoreOpen() {
+    const status = settings.store_status || 'auto';
+    if (status === 'open') return { open: true };
+    if (status === 'closed') {
+      return {
+        open: false,
+        message: (settings.closed_message || '').trim() || 'Restaurant is currently closed for orders.'
+      };
+    }
+
+    const openTime = (settings.open_time || '11:00').trim();
+    const closeTime = (settings.close_time || '23:00').trim();
+
+    const [oH, oM] = openTime.split(':').map(Number);
+    const [cH, cM] = closeTime.split(':').map(Number);
+    const openMinutes = (isNaN(oH) ? 11 : oH) * 60 + (isNaN(oM) ? 0 : oM);
+    const closeMinutes = (isNaN(cH) ? 23 : cH) * 60 + (isNaN(cM) ? 0 : cM);
+
     const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes();
-    const timeMin = h * 60 + m;
-    // Opening hours: 11:00 AM (660 mins) to 11:00 PM (1380 mins)
-    const isOpen = (timeMin >= 660 && timeMin < 1380);
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    const statusEl = $('liveStatusText');
-    const navPill = document.querySelector('.live-pill');
+    let isOpen = false;
+    if (closeMinutes > openMinutes) {
+      isOpen = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+    } else {
+      isOpen = currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+    }
 
-    if (isOpen) {
-      if (statusEl) {
-        statusEl.innerHTML = '<span class="text-success"><i class="bi bi-circle-fill live-dot-inline me-1"></i>Accepting Orders Live</span> · Instant WhatsApp Dispatch';
-      }
+    const formatTime12 = (tStr) => {
+      if (!tStr) return '';
+      const [h, m] = tStr.split(':').map(Number);
+      const ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      const mStr = String(m || 0).padStart(2, '0');
+      return `${h12}:${mStr} ${ampm}`;
+    };
+
+    const hoursText = settings.opening_hours && settings.opening_hours.trim()
+      ? settings.opening_hours.trim()
+      : `${formatTime12(openTime)} – ${formatTime12(closeTime)}`;
+    const defaultMsg = `Restaurant is closed now. We accept orders from ${hoursText}.`;
+    const message = (settings.closed_message || '').trim() || defaultMsg;
+
+    return { open: isOpen, message, openTime, closeTime, hoursText };
+  }
+
+  function updateLiveStatus() {
+    const storeState = isStoreOpen();
+    const navPill = $('navLivePill') || document.querySelector('.live-pill');
+    const navText = $('navLiveText');
+    const closedBanner = $('storeClosedBanner');
+    const closedBannerText = $('storeClosedBannerText');
+    const cartClosedNotice = $('cartClosedNotice');
+    const cartClosedMsg = $('cartClosedMessage');
+    const checkoutBtn = $('checkoutBtn');
+
+    if (storeState.open) {
       if (navPill) {
         navPill.classList.remove('closed');
         navPill.title = 'Kitchen Open · Accepting WhatsApp orders';
       }
-    } else {
-      if (statusEl) {
-        statusEl.innerHTML = '<span class="text-warning"><i class="bi bi-clock-history me-1"></i>Pre-Orders Open</span> · Kitchen opens at 11:00 AM';
+      if (navText) navText.textContent = 'LIVE';
+      if (closedBanner) closedBanner.classList.add('d-none');
+      if (cartClosedNotice) cartClosedNotice.classList.add('d-none');
+      if (checkoutBtn && cartCount() > 0) {
+        checkoutBtn.classList.remove('btn-secondary');
+        checkoutBtn.classList.add('btn-brand');
+        checkoutBtn.innerHTML = 'Continue to checkout <i class="bi bi-arrow-right ms-2"></i>';
       }
+    } else {
       if (navPill) {
         navPill.classList.add('closed');
-        navPill.title = 'Pre-orders open for 11:00 AM';
+        navPill.title = storeState.message;
+      }
+      if (navText) navText.textContent = 'CLOSED';
+      if (closedBanner) {
+        closedBanner.classList.remove('d-none');
+        if (closedBannerText) closedBannerText.textContent = storeState.message;
+      }
+      if (cartClosedNotice) {
+        cartClosedNotice.classList.remove('d-none');
+        if (cartClosedMsg) cartClosedMsg.textContent = storeState.message;
+      }
+      if (checkoutBtn) {
+        checkoutBtn.classList.remove('btn-brand');
+        checkoutBtn.classList.add('btn-secondary');
+        checkoutBtn.innerHTML = '<i class="bi bi-door-closed me-2"></i>Restaurant is Closed';
       }
     }
   }
@@ -561,10 +623,23 @@
       delete cart[b.dataset.remove];
       saveCart();
     }));
+    updateLiveStatus();
   }
 
   function showCheckout() {
     if (!cartCount()) return;
+
+    const storeState = isStoreOpen();
+    if (!storeState.open) {
+      if (storeClosedModal) {
+        if ($('storeClosedModalText')) $('storeClosedModalText').textContent = storeState.message;
+        storeClosedModal.show();
+      } else {
+        notify(storeState.message);
+      }
+      return;
+    }
+
     if (total() < Number(settings.minimum_order_amount || 0)) {
       notify(`Minimum order is ${money(settings.minimum_order_amount)}.`);
       return;
@@ -635,6 +710,17 @@
   $('checkoutForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const form = e.currentTarget;
+    const storeState = isStoreOpen();
+    if (!storeState.open) {
+      checkoutModal.hide();
+      if (storeClosedModal) {
+        if ($('storeClosedModalText')) $('storeClosedModalText').textContent = storeState.message;
+        storeClosedModal.show();
+      } else {
+        notify(storeState.message);
+      }
+      return;
+    }
     if (!form.checkValidity()) {
       form.classList.add('was-validated');
       return;
@@ -748,8 +834,6 @@
 
     const name = settings.restaurant_name || cfg.defaultRestaurantName;
     if ($('restaurantName')) $('restaurantName').textContent = name;
-    if ($('openingHours')) $('openingHours').textContent = settings.opening_hours || 'Fresh food · Made with love';
-    if ($('heroAddress')) $('heroAddress').textContent = settings.address || 'AB-3, Mile Stone, Anand Vidhyanagar Road, Anand - 388 001';
     updateLiveStatus();
 
     // Offer banner
