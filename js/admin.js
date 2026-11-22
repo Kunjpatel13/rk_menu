@@ -3,6 +3,12 @@
   const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = n => `₹${Number(n || 0).toFixed(0)}`;
   let adminUser, menu = [], categories = [], settings = {}, editingImageUrl = '', editingCategoryImageUrl = '';
+  let activeConfigDay = 'all';
+  let currentDaySlots = {
+    all: [{ start: '10:30', end: '15:00' }, { start: '17:00', end: '23:00' }],
+    mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: []
+  };
+  let categoryDiscountsMap = {};
   const modal = $('itemModal') ? bootstrap.Modal.getOrCreateInstance($('itemModal')) : null;
   const bulkModal = $('bulkItemModal') ? bootstrap.Modal.getOrCreateInstance($('bulkItemModal')) : null;
   const categoryModal = $('categoryModal') ? bootstrap.Modal.getOrCreateInstance($('categoryModal')) : null;
@@ -309,6 +315,276 @@
     listEl.querySelectorAll('[data-delcat]').forEach(b => b.addEventListener('click', () => deleteCategory(b.dataset.delcat)));
   }
 
+  function formatTime12(tStr) {
+    if (!tStr) return '';
+    const [h, m] = tStr.split(':').map(Number);
+    const ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const mStr = String(m || 0).padStart(2, '0');
+    return `${h12}:${mStr} ${ampm}`;
+  }
+
+  function parseSlots(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function parseDaySlots(val) {
+    if (!val) return {};
+    if (typeof val === 'object' && val !== null && !Array.isArray(val)) return val;
+    try {
+      const parsed = JSON.parse(val);
+      return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function parseCategoryDiscounts(val) {
+    if (!val) return {};
+    if (typeof val === 'object' && val !== null) return val;
+    try {
+      const p = JSON.parse(val);
+      return (typeof p === 'object' && p !== null) ? p : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function initSlotData() {
+    const defaultAll = [{ start: '10:30', end: '15:00' }, { start: '17:00', end: '23:00' }];
+    const loadedAll = parseSlots(settings.time_slots);
+    currentDaySlots.all = (loadedAll && loadedAll.length) ? loadedAll : defaultAll;
+
+    const loadedDays = parseDaySlots(settings.day_slots);
+    ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].forEach(d => {
+      if (Array.isArray(loadedDays[d]) && loadedDays[d].length) {
+        currentDaySlots[d] = loadedDays[d];
+      } else {
+        currentDaySlots[d] = JSON.parse(JSON.stringify(currentDaySlots.all));
+      }
+    });
+  }
+
+  function getSlotsForDay(day) {
+    if (!currentDaySlots[day]) currentDaySlots[day] = [];
+    return currentDaySlots[day];
+  }
+
+  function renderTimeSlots() {
+    const container = $('timeSlotsContainer');
+    if (!container) return;
+    const slots = getSlotsForDay(activeConfigDay);
+    const dayNames = {
+      all: 'All Days (Default Schedule)',
+      mon: 'Monday Schedule',
+      tue: 'Tuesday Schedule',
+      wed: 'Wednesday Schedule',
+      thu: 'Thursday Schedule',
+      fri: 'Friday Schedule',
+      sat: 'Saturday Schedule',
+      sun: 'Sunday Schedule'
+    };
+
+    if ($('currentConfiguringDayLabel')) {
+      $('currentConfiguringDayLabel').textContent = dayNames[activeConfigDay] || 'Schedule';
+    }
+
+    if (!slots.length) {
+      container.innerHTML = `
+        <div class="text-center py-3 text-muted border border-dashed rounded bg-white">
+          <i class="bi bi-clock me-1"></i>No time slots set for this day (Closed).
+          <div class="mt-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addFirstSlotBtn"><i class="bi bi-plus-lg me-1"></i>Add Slot</button>
+          </div>
+        </div>
+      `;
+      const btn = container.querySelector('#addFirstSlotBtn');
+      if (btn) btn.addEventListener('click', () => addTimeSlot());
+      return;
+    }
+
+    container.innerHTML = slots.map((s, idx) => `
+      <div class="d-flex align-items-center gap-2 bg-white p-2 rounded border slot-row" data-index="${idx}">
+        <span class="badge bg-light text-dark border">Slot ${idx + 1}</span>
+        <div class="d-flex align-items-center gap-2 flex-grow-1 flex-wrap">
+          <input type="time" class="form-control form-control-sm slot-start-input" style="max-width: 140px;" value="${s.start || '10:30'}" required>
+          <span class="text-muted small fw-bold">to</span>
+          <input type="time" class="form-control form-control-sm slot-end-input" style="max-width: 140px;" value="${s.end || '15:00'}" required>
+          <span class="text-secondary small ms-2 d-none d-md-inline">(${formatTime12(s.start)} – ${formatTime12(s.end)})</span>
+        </div>
+        <button type="button" class="btn btn-outline-danger btn-sm remove-slot-btn" data-index="${idx}" title="Delete slot">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.slot-start-input').forEach((input, i) => {
+      input.addEventListener('change', () => {
+        if (slots[i]) slots[i].start = input.value;
+      });
+    });
+    container.querySelectorAll('.slot-end-input').forEach((input, i) => {
+      input.addEventListener('change', () => {
+        if (slots[i]) slots[i].end = input.value;
+      });
+    });
+    container.querySelectorAll('.remove-slot-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const index = parseInt(b.dataset.index, 10);
+        slots.splice(index, 1);
+        renderTimeSlots();
+      });
+    });
+  }
+
+  function addTimeSlot() {
+    const slots = getSlotsForDay(activeConfigDay);
+    let nextStart = '17:00';
+    let nextEnd = '23:00';
+    if (slots.length === 1 && slots[0].end <= '15:00') {
+      nextStart = '17:00';
+      nextEnd = '23:00';
+    } else if (slots.length > 0) {
+      const last = slots[slots.length - 1];
+      nextStart = last.end || '12:00';
+      nextEnd = '23:00';
+    }
+    slots.push({ start: nextStart, end: nextEnd });
+    renderTimeSlots();
+  }
+
+  function copySlotsToAllDays() {
+    const currentSlots = getSlotsForDay(activeConfigDay);
+    const cloned = JSON.parse(JSON.stringify(currentSlots));
+    currentDaySlots.all = JSON.parse(JSON.stringify(cloned));
+    ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].forEach(d => {
+      currentDaySlots[d] = JSON.parse(JSON.stringify(cloned));
+    });
+    notice('Copied slots to all days! Click "Save settings" to persist.');
+  }
+
+  function initCategoryDiscounts() {
+    const fromSettings = parseCategoryDiscounts(settings.category_discounts);
+    categoryDiscountsMap = { ...fromSettings };
+    categories.forEach(c => {
+      if (c.discount_percent !== undefined && c.discount_percent !== null) {
+        if (categoryDiscountsMap[c.id] === undefined) {
+          categoryDiscountsMap[c.id] = Number(c.discount_percent);
+        }
+      }
+    });
+  }
+
+  function renderCategoryDiscountTable() {
+    const tbody = $('categoryDiscountTableBody');
+    if (!tbody) return;
+
+    if (!categories.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-muted">No categories created yet.</td></tr>';
+      return;
+    }
+
+    const mains = categories.filter(c => !c.parent_id);
+    let rowsHtml = '';
+
+    const renderRow = (cat, isSub = false, parentName = '') => {
+      const dVal = (categoryDiscountsMap[cat.id] !== undefined)
+        ? categoryDiscountsMap[cat.id]
+        : (cat.discount_percent ? Number(cat.discount_percent) : 0);
+      const isZero = Number(dVal) === 0;
+
+      return `
+        <tr data-cat-id="${cat.id}">
+          <td>
+            <div class="${isSub ? 'ps-3' : 'fw-bold'} d-flex align-items-center gap-2">
+              ${isSub ? '<span class="text-muted">↳</span>' : '<span class="badge bg-secondary-subtle text-dark border">Main</span>'}
+              <span>${escapeHtml(cat.name)}</span>
+              ${isSub && parentName ? `<small class="text-muted">(${escapeHtml(parentName)})</small>` : ''}
+            </div>
+          </td>
+          <td>
+            <div class="input-group input-group-sm">
+              <input type="number" min="0" max="100" step="0.5" class="form-control cat-discount-input"
+                     data-cat-id="${cat.id}" value="${dVal}">
+              <span class="input-group-text">%</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge ${isZero ? 'bg-secondary' : 'bg-success'} status-badge">
+              ${isZero ? 'Full Price (0%)' : `${dVal}% OFF`}
+            </span>
+          </td>
+        </tr>
+      `;
+    };
+
+    mains.forEach(main => {
+      rowsHtml += renderRow(main, false);
+      const subs = categories.filter(c => c.parent_id === main.id);
+      subs.forEach(sub => {
+        rowsHtml += renderRow(sub, true, main.name);
+      });
+    });
+
+    const orphans = categories.filter(c => c.parent_id && !categories.some(m => m.id === c.parent_id));
+    orphans.forEach(o => {
+      rowsHtml += renderRow(o, true, 'Other');
+    });
+
+    tbody.innerHTML = rowsHtml;
+
+    tbody.querySelectorAll('.cat-discount-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const catId = input.dataset.catId;
+        const val = Math.max(0, Math.min(100, Number(input.value || 0)));
+        categoryDiscountsMap[catId] = val;
+        const row = input.closest('tr');
+        const badge = row ? row.querySelector('.status-badge') : null;
+        if (badge) {
+          if (val === 0) {
+            badge.className = 'badge bg-secondary status-badge';
+            badge.textContent = 'Full Price (0%)';
+          } else {
+            badge.className = 'badge bg-success status-badge';
+            badge.textContent = `${val}% OFF`;
+          }
+        }
+      });
+    });
+  }
+
+  function applySabjiChinesePreset() {
+    categories.forEach(c => {
+      const n = (c.name || '').toLowerCase();
+      if (
+        n.includes('sabji') || n.includes('curry') || n.includes('paneer') ||
+        n.includes('kaju') || n.includes('chinese') || n.includes('starter') ||
+        n.includes('manchurian') || n.includes('noodle')
+      ) {
+        categoryDiscountsMap[c.id] = 10;
+      } else {
+        categoryDiscountsMap[c.id] = 0;
+      }
+    });
+    renderCategoryDiscountTable();
+    notice('Preset applied: 10% on Curries & Chinese, 0% on Roti & Beverages. Click "Save settings" to persist.');
+  }
+
+  function clearAllCategoryDiscounts() {
+    categories.forEach(c => {
+      categoryDiscountsMap[c.id] = 0;
+    });
+    renderCategoryDiscountTable();
+    notice('All category discounts set to 0% (Full Price). Click "Save settings" to persist.');
+  }
+
   function fillSettings() {
     $('settingName').value = settings.restaurant_name || '';
     $('settingWhatsapp').value = settings.whatsapp_number || '';
@@ -322,9 +598,12 @@
     if ($('settingUpiId')) $('settingUpiId').value = settings.upi_id || '';
     if ($('settingQrImage')) $('settingQrImage').value = settings.qr_image_url || '';
     if ($('settingStoreStatus')) $('settingStoreStatus').value = settings.store_status || 'auto';
-    if ($('settingOpenTime')) $('settingOpenTime').value = settings.open_time || '11:00';
-    if ($('settingCloseTime')) $('settingCloseTime').value = settings.close_time || '23:00';
     if ($('settingClosedMessage')) $('settingClosedMessage').value = settings.closed_message || '';
+
+    initSlotData();
+    renderTimeSlots();
+    initCategoryDiscounts();
+    renderCategoryDiscountTable();
   }
 
   function updateImagePreview(url, sourceLabel = 'Image selected') {
@@ -357,6 +636,7 @@
     if ($('itemType')) $('itemType').value = 'Veg';
     $('itemAvailable').value = 'true';
     $('itemBestseller').checked = false;
+    if ($('itemIsDiscountable')) $('itemIsDiscountable').checked = true;
     if ($('itemImage')) $('itemImage').value = '';
     if ($('itemImageUrl')) $('itemImageUrl').value = '';
     editingImageUrl = '';
@@ -378,6 +658,7 @@
     if ($('itemType')) $('itemType').value = x.food_type || 'Veg';
     $('itemAvailable').value = String(x.is_available);
     $('itemBestseller').checked = !!x.is_bestseller;
+    if ($('itemIsDiscountable')) $('itemIsDiscountable').checked = x.is_discountable !== false;
     if ($('itemImage')) $('itemImage').value = '';
     editingImageUrl = x.image_url || '';
     if ($('itemImageUrl')) $('itemImageUrl').value = editingImageUrl;
@@ -454,6 +735,7 @@
 
       const halfVal = $('itemHalfPrice') ? $('itemHalfPrice').value.trim() : '';
       const halfPrice = (halfVal !== '' && !isNaN(Number(halfVal)) && Number(halfVal) > 0) ? Number(halfVal) : null;
+      const isDisc = $('itemIsDiscountable') ? $('itemIsDiscountable').checked : true;
       const payload = {
         name: $('itemName').value.trim(),
         category_id: $('itemCategory').value,
@@ -463,16 +745,18 @@
         food_type: $('itemType')?.value || 'Veg',
         is_available: $('itemAvailable').value === 'true',
         is_bestseller: $('itemBestseller').checked,
+        is_discountable: isDisc,
         image_url: finalImage || null
       };
       if (!payload.category_id) throw new Error('Create a category before adding a menu item.');
       const id = $('itemId').value;
       let result = id ? await db.from('menu_items').update(payload).eq('id', id) : await db.from('menu_items').insert(payload);
-      if (result.error && result.error.message && result.error.message.includes('half_price')) {
-        delete payload.half_price;
+      if (result.error && result.error.message && (result.error.message.includes('half_price') || result.error.message.includes('is_discountable'))) {
+        if (result.error.message.includes('half_price')) delete payload.half_price;
+        if (result.error.message.includes('is_discountable')) delete payload.is_discountable;
         result = id ? await db.from('menu_items').update(payload).eq('id', id) : await db.from('menu_items').insert(payload);
         if (result.error) throw result.error;
-        notice('Saved! Notice: Run migration-half-price-discount-qr.sql in Supabase to enable Half Price.', true);
+        notice('Saved! Notice: Run migration-slots-and-category-discounts.sql in Supabase to enable Half Price & Discount controls.', true);
       } else if (result.error) {
         throw result.error;
       } else {
@@ -537,6 +821,7 @@
     editingCategoryImageUrl = '';
     if ($('categoryEditImageUrl')) $('categoryEditImageUrl').value = '';
     if ($('categoryEditImageFile')) $('categoryEditImageFile').value = '';
+    if ($('categoryEditDiscount')) $('categoryEditDiscount').value = '0';
     updateCategoryImagePreview('');
     populateCategoryEditParent(null, '');
     if ($('categoryModalTitle')) $('categoryModalTitle').textContent = 'Add new category';
@@ -552,6 +837,10 @@
     editingCategoryImageUrl = c.image_url || '';
     if ($('categoryEditImageUrl')) $('categoryEditImageUrl').value = editingCategoryImageUrl;
     if ($('categoryEditImageFile')) $('categoryEditImageFile').value = '';
+    if ($('categoryEditDiscount')) {
+      const disc = (categoryDiscountsMap[c.id] !== undefined) ? categoryDiscountsMap[c.id] : (c.discount_percent ?? 0);
+      $('categoryEditDiscount').value = disc;
+    }
     updateCategoryImagePreview(editingCategoryImageUrl, editingCategoryImageUrl ? 'Current Saved Image' : '');
     populateCategoryEditParent(c.id, c.parent_id || '');
     if ($('categoryModalTitle')) $('categoryModalTitle').textContent = c.parent_id ? 'Edit sub-category' : 'Edit main category & image';
@@ -569,6 +858,7 @@
       const parentId = $('categoryEditParent').value || null;
       const file = $('categoryEditImageFile')?.files?.[0];
       const onlineUrl = $('categoryEditImageUrl')?.value?.trim();
+      const catDiscount = $('categoryEditDiscount') ? Math.max(0, Math.min(100, Number($('categoryEditDiscount').value || 0))) : 0;
 
       let finalImg = null;
       if (file) {
@@ -583,6 +873,7 @@
       const payload = {
         name,
         parent_id: parentId,
+        discount_percent: catDiscount,
         image_url: finalImg || null
       };
 
@@ -596,11 +887,19 @@
       }
 
       if (result.error) {
+        let changed = false;
         if (result.error.message && result.error.message.includes('image_url')) {
           delete payload.image_url;
+          changed = true;
+        }
+        if (result.error.message && result.error.message.includes('discount_percent')) {
+          delete payload.discount_percent;
+          changed = true;
+        }
+        if (changed) {
           result = id ? await db.from('categories').update(payload).eq('id', id) : await db.from('categories').insert(payload);
           if (result.error) throw result.error;
-          notice('Category saved! Notice: Run migration-category-image.sql in Supabase to enable category images.', true);
+          notice('Category saved! Notice: Run migration-slots-and-category-discounts.sql in Supabase to enable all columns.', true);
         } else {
           throw result.error;
         }
@@ -888,6 +1187,31 @@
   // Settings form
   $('settingsForm').addEventListener('submit', async e => {
     e.preventDefault();
+
+    // Ensure currently visible slot inputs are saved to state
+    const container = $('timeSlotsContainer');
+    if (container) {
+      const activeSlots = getSlotsForDay(activeConfigDay);
+      container.querySelectorAll('.slot-row').forEach((row, i) => {
+        const start = row.querySelector('.slot-start-input')?.value;
+        const end = row.querySelector('.slot-end-input')?.value;
+        if (start && end && activeSlots[i]) {
+          activeSlots[i].start = start;
+          activeSlots[i].end = end;
+        }
+      });
+    }
+
+    // Auto-generate hours summary if empty
+    let hours = $('settingHours').value.trim();
+    if (!hours && currentDaySlots.all && currentDaySlots.all.length) {
+      hours = 'Daily · ' + currentDaySlots.all.map(s => `${formatTime12(s.start)} – ${formatTime12(s.end)}`).join(', ');
+      $('settingHours').value = hours;
+    }
+
+    const firstSlot = (currentDaySlots.all && currentDaySlots.all[0]) || { start: '10:30', end: '15:00' };
+    const lastSlot = (currentDaySlots.all && currentDaySlots.all[currentDaySlots.all.length - 1]) || firstSlot;
+
     const payload = {
       id: 1,
       restaurant_name: $('settingName').value.trim(),
@@ -902,13 +1226,21 @@
       upi_id: $('settingUpiId') ? $('settingUpiId').value.trim() : '',
       qr_image_url: $('settingQrImage') ? $('settingQrImage').value.trim() : '',
       store_status: $('settingStoreStatus') ? $('settingStoreStatus').value : 'auto',
-      open_time: $('settingOpenTime') ? $('settingOpenTime').value.trim() : '11:00',
-      close_time: $('settingCloseTime') ? $('settingCloseTime').value.trim() : '23:00',
-      closed_message: $('settingClosedMessage') ? $('settingClosedMessage').value.trim() : ''
+      open_time: firstSlot.start,
+      close_time: lastSlot.end,
+      closed_message: $('settingClosedMessage') ? $('settingClosedMessage').value.trim() : '',
+      time_slots: JSON.stringify(currentDaySlots.all || []),
+      day_slots: JSON.stringify(currentDaySlots || {}),
+      category_discounts: JSON.stringify(categoryDiscountsMap || {})
     };
+
     if (!/^\d{10,15}$/.test(payload.whatsapp_number)) return notice('Enter WhatsApp number with country code, e.g. 919876543210.', true);
+
     let { error } = await db.from('restaurant_settings').upsert(payload);
     if (error && error.message && (
+      error.message.includes('time_slots') || 
+      error.message.includes('day_slots') || 
+      error.message.includes('category_discounts') || 
       error.message.includes('discount') || 
       error.message.includes('upi') || 
       error.message.includes('qr') || 
@@ -929,12 +1261,38 @@
       };
       const retry = await db.from('restaurant_settings').upsert(fallbackPayload);
       if (retry.error) return notice(retry.error.message, true);
-      notice('Core settings saved! Run migration-store-timing.sql in Supabase to enable Store Timing & Status columns.', true);
+      notice('Core settings saved! Run migration-slots-and-category-discounts.sql in Supabase to enable slot-wise timings and category discounts.', true);
       await loadAll();
       return;
     }
-    if (error) notice(error.message, true); else { await loadAll(); notice('Restaurant settings saved.'); }
+
+    // Persist individual category discounts to categories table
+    const catUpdates = Object.entries(categoryDiscountsMap).map(([id, dVal]) =>
+      db.from('categories').update({ discount_percent: Number(dVal || 0) }).eq('id', id)
+    );
+    await Promise.allSettled(catUpdates);
+
+    if (error) notice(error.message, true); else { await loadAll(); notice('Restaurant settings, time slots, and category discounts saved.'); }
   });
+
+  // Slot timing buttons
+  const dayGroup = $('daySelectorGroup');
+  if (dayGroup) {
+    dayGroup.querySelectorAll('button[data-day]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        dayGroup.querySelectorAll('button[data-day]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeConfigDay = btn.dataset.day;
+        renderTimeSlots();
+      });
+    });
+  }
+  if ($('addSlotBtn')) $('addSlotBtn').addEventListener('click', addTimeSlot);
+  if ($('copyToAllDaysBtn')) $('copyToAllDaysBtn').addEventListener('click', copySlotsToAllDays);
+
+  // Category discount table preset buttons
+  if ($('presetSabjiChinese10Btn')) $('presetSabjiChinese10Btn').addEventListener('click', applySabjiChinesePreset);
+  if ($('clearCategoryDiscountsBtn')) $('clearCategoryDiscountsBtn').addEventListener('click', clearAllCategoryDiscounts);
 
   // Manage menu filter and search event listeners
   if ($('adminMenuSearch')) $('adminMenuSearch').addEventListener('input', renderMenuTable);

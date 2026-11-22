@@ -48,10 +48,61 @@
     return Math.max(0, Math.min(100, Number(settings.discount_percent || 0)));
   }
 
+  function getItemDiscountPercent(item) {
+    if (!item) return 0;
+    if (item.is_discountable === false) return 0;
+
+    let catId = item.category_id;
+    if (!catId) {
+      const orig = menu.find(m => m.id === item.id);
+      if (orig) {
+        catId = orig.category_id;
+        if (orig.is_discountable === false) return 0;
+      }
+    }
+
+    if (catId) {
+      let catDiscounts = {};
+      if (settings.category_discounts) {
+        try {
+          catDiscounts = typeof settings.category_discounts === 'object'
+            ? settings.category_discounts
+            : JSON.parse(settings.category_discounts);
+        } catch { catDiscounts = {}; }
+      }
+      if (catDiscounts && catDiscounts[catId] !== undefined) {
+        return Math.max(0, Math.min(100, Number(catDiscounts[catId])));
+      }
+
+      const cat = categories.find(c => c.id === catId);
+      if (cat && cat.discount_percent !== undefined && cat.discount_percent !== null) {
+        return Math.max(0, Math.min(100, Number(cat.discount_percent)));
+      }
+
+      if (cat && cat.parent_id) {
+        if (catDiscounts && catDiscounts[cat.parent_id] !== undefined) {
+          return Math.max(0, Math.min(100, Number(catDiscounts[cat.parent_id])));
+        }
+        const parentCat = categories.find(c => c.id === cat.parent_id);
+        if (parentCat && parentCat.discount_percent !== undefined && parentCat.discount_percent !== null) {
+          return Math.max(0, Math.min(100, Number(parentCat.discount_percent)));
+        }
+      }
+    }
+
+    return discountPercent();
+  }
+
   function discountAmount() {
-    const p = discountPercent();
-    if (p <= 0) return 0;
-    return Math.round((subtotal() * p) / 100);
+    let totalDisc = 0;
+    cartRows().forEach(x => {
+      const p = getItemDiscountPercent(x);
+      if (p > 0) {
+        const itemTotal = Number(x.price) * x.quantity;
+        totalDisc += Math.round((itemTotal * p) / 100);
+      }
+    });
+    return totalDisc;
   }
 
   function delivery() {
@@ -427,7 +478,9 @@
       portion: chosenPortion,
       price: itemPrice,
       image_url: item.image_url,
-      quantity: existing ? existing.quantity + 1 : 1
+      quantity: existing ? existing.quantity + 1 : 1,
+      category_id: item.category_id,
+      is_discountable: item.is_discountable !== false
     };
 
     saveCart();
@@ -441,6 +494,15 @@
     saveCart();
   }
 
+  const formatTime12 = (tStr) => {
+    if (!tStr) return '';
+    const [h, m] = tStr.split(':').map(Number);
+    const ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const mStr = String(m || 0).padStart(2, '0');
+    return `${h12}:${mStr} ${ampm}`;
+  };
+
   function isStoreOpen() {
     const status = settings.store_status || 'auto';
     if (status === 'open') return { open: true };
@@ -451,40 +513,86 @@
       };
     }
 
-    const openTime = (settings.open_time || '11:00').trim();
-    const closeTime = (settings.close_time || '23:00').trim();
-
-    const [oH, oM] = openTime.split(':').map(Number);
-    const [cH, cM] = closeTime.split(':').map(Number);
-    const openMinutes = (isNaN(oH) ? 11 : oH) * 60 + (isNaN(oM) ? 0 : oM);
-    const closeMinutes = (isNaN(cH) ? 23 : cH) * 60 + (isNaN(cM) ? 0 : cM);
-
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const currentDayKey = dayKeys[now.getDay()];
 
-    let isOpen = false;
-    if (closeMinutes > openMinutes) {
-      isOpen = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
-    } else {
-      isOpen = currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+    let slots = [];
+    if (settings.day_slots) {
+      try {
+        const daySlots = typeof settings.day_slots === 'object' ? settings.day_slots : JSON.parse(settings.day_slots);
+        if (daySlots && Array.isArray(daySlots[currentDayKey]) && daySlots[currentDayKey].length) {
+          slots = daySlots[currentDayKey];
+        }
+      } catch { /* ignore */ }
     }
 
-    const formatTime12 = (tStr) => {
-      if (!tStr) return '';
-      const [h, m] = tStr.split(':').map(Number);
-      const ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
-      const h12 = h % 12 || 12;
-      const mStr = String(m || 0).padStart(2, '0');
-      return `${h12}:${mStr} ${ampm}`;
-    };
+    if (!slots.length && settings.time_slots) {
+      try {
+        const parsed = typeof settings.time_slots === 'object' ? settings.time_slots : JSON.parse(settings.time_slots);
+        if (Array.isArray(parsed) && parsed.length) {
+          slots = parsed;
+        }
+      } catch { /* ignore */ }
+    }
 
-    const hoursText = settings.opening_hours && settings.opening_hours.trim()
-      ? settings.opening_hours.trim()
-      : `${formatTime12(openTime)} – ${formatTime12(closeTime)}`;
-    const defaultMsg = `Restaurant is closed now. We accept orders from ${hoursText}.`;
+    if (!slots.length) {
+      const openTime = (settings.open_time || '10:30').trim();
+      const closeTime = (settings.close_time || '23:00').trim();
+      slots = [{ start: openTime, end: closeTime }];
+    }
+
+    const parsedIntervals = slots.map(s => {
+      const [sh, sm] = (s.start || '10:30').split(':').map(Number);
+      const [eh, em] = (s.end || '23:00').split(':').map(Number);
+      const startMin = (isNaN(sh) ? 10 : sh) * 60 + (isNaN(sm) ? 30 : sm);
+      const endMin = (isNaN(eh) ? 23 : eh) * 60 + (isNaN(em) ? 0 : em);
+      return { startMin, endMin, startStr: s.start, endStr: s.end };
+    }).sort((a, b) => a.startMin - b.startMin);
+
+    let activeSlot = null;
+    for (const inv of parsedIntervals) {
+      if (inv.endMin > inv.startMin) {
+        if (currentMinutes >= inv.startMin && currentMinutes < inv.endMin) {
+          activeSlot = inv;
+          break;
+        }
+      } else {
+        if (currentMinutes >= inv.startMin || currentMinutes < inv.endMin) {
+          activeSlot = inv;
+          break;
+        }
+      }
+    }
+
+    const slotsSummary = parsedIntervals.map(i => `${formatTime12(i.startStr)} – ${formatTime12(i.endStr)}`).join(', ');
+
+    if (activeSlot) {
+      return {
+        open: true,
+        currentSlot: activeSlot,
+        hoursText: slotsSummary
+      };
+    }
+
+    const nextSlot = parsedIntervals.find(i => i.startMin > currentMinutes);
+    let defaultMsg = '';
+
+    if (nextSlot) {
+      defaultMsg = `Kitchen is currently on break. Next order slot starts at ${formatTime12(nextSlot.startStr)}. Today's slots: ${slotsSummary}.`;
+    } else if (parsedIntervals.length > 0 && currentMinutes < parsedIntervals[0].startMin) {
+      defaultMsg = `Kitchen opens soon. Today's first order slot begins at ${formatTime12(parsedIntervals[0].startStr)}.`;
+    } else {
+      defaultMsg = `Kitchen is closed for today. We accept orders daily during: ${slotsSummary}.`;
+    }
+
     const message = (settings.closed_message || '').trim() || defaultMsg;
-
-    return { open: isOpen, message, openTime, closeTime, hoursText };
+    return {
+      open: false,
+      message,
+      hoursText: slotsSummary
+    };
   }
 
   function updateLiveStatus() {
@@ -566,7 +674,10 @@
     if (discRow) {
       if (disc > 0) {
         discRow.classList.remove('d-none');
-        if ($('cartDiscountLabel')) $('cartDiscountLabel').textContent = `Discount (${discountPercent()}%)`;
+        if ($('cartDiscountLabel')) {
+          const genP = discountPercent();
+          $('cartDiscountLabel').textContent = genP > 0 ? `Discount (${genP}%)` : `Discount (Category Offers)`;
+        }
         if ($('cartDiscount')) $('cartDiscount').textContent = `-${money(disc)}`;
       } else {
         discRow.classList.add('d-none');
@@ -650,7 +761,9 @@
       `<div class="d-flex justify-content-between mb-1"><span>${cartCount()} item(s)</span><strong>${money(subtotal())}</strong></div>`
     ];
     if (disc > 0) {
-      rows.push(`<div class="d-flex justify-content-between text-success mb-1"><span>Discount (${discountPercent()}%)</span><strong>-${money(disc)}</strong></div>`);
+      const genP = discountPercent();
+      const discTitle = genP > 0 ? `Discount (${genP}%)` : `Discount (Category Offers)`;
+      rows.push(`<div class="d-flex justify-content-between text-success mb-1"><span>${discTitle}</span><strong>-${money(disc)}</strong></div>`);
     }
     rows.push(
       `<div class="d-flex justify-content-between mb-2"><span>Delivery</span><strong>${money(delivery())}</strong></div>`,
@@ -782,7 +895,9 @@
     );
 
     if (disc > 0) {
-      messageLines.push(`Discount (${discountPercent()}%): -${money(disc)}`);
+      const genP = discountPercent();
+      const discTitle = genP > 0 ? `Discount (${genP}%)` : `Discount (Category Offers)`;
+      messageLines.push(`${discTitle}: -${money(disc)}`);
     }
 
     messageLines.push(
@@ -837,7 +952,8 @@
     if ($('footerRestaurantName')) $('footerRestaurantName').textContent = name;
     if ($('footerNameBottom')) $('footerNameBottom').textContent = name;
     if ($('footerAddress')) $('footerAddress').textContent = settings.address || 'AB-3, Mile Stone, Anand Vidhyanagar Road, Anand - 388 001';
-    if ($('footerHours')) $('footerHours').textContent = settings.opening_hours || 'Daily · 11:00 AM – 11:00 PM';
+    const storeState = isStoreOpen();
+    if ($('footerHours')) $('footerHours').textContent = settings.opening_hours || storeState.hoursText || 'Daily · 10:30 AM – 3:00 PM, 5:00 PM – 11:00 PM';
     if ($('footerPhone')) $('footerPhone').textContent = settings.contact_phone || '7069300077 / 9979678889';
     if ($('footerWhatsapp')) $('footerWhatsapp').textContent = settings.whatsapp_number || '9979678889';
     if ($('year')) $('year').textContent = new Date().getFullYear();
