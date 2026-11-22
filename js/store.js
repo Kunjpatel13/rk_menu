@@ -4,6 +4,69 @@
   const money = (n) => `${cfg.currencySymbol}${Number(n || 0).toFixed(0)}`;
   const escapeHtml = (v = '') => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  function handleUpiPaymentRedirect() {
+    try {
+      const search = window.location.search;
+      if (!search || !search.includes('pay_upi=1')) return;
+      const params = new URLSearchParams(search);
+      if (params.get('pay_upi') !== '1') return;
+
+      const pa = (params.get('pa') || '').trim();
+      const pn = (params.get('pn') || 'Radhe Krushna Food Zone').trim();
+      const am = (params.get('am') || '').trim();
+      const tn = (params.get('tn') || 'Restaurant Order').trim();
+
+      if (!pa) return;
+
+      const upiUri = `upi://pay?pa=${encodeURIComponent(pa)}&pn=${encodeURIComponent(pn)}&am=${encodeURIComponent(am)}&cu=INR&tn=${encodeURIComponent(tn)}`;
+
+      // Automatically trigger redirect to the user's UPI app (Google Pay, PhonePe, Paytm, etc.)
+      window.location.href = upiUri;
+
+      const renderOverlay = () => {
+        if (document.querySelector('.upi-redirect-overlay')) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'upi-redirect-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);';
+        overlay.innerHTML = `
+          <div style="background:#fff;border-radius:18px;max-width:440px;width:100%;padding:28px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.3);font-family:system-ui,-apple-system,sans-serif;">
+            <div style="width:64px;height:64px;background:#e8f5e9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-wallet2" style="font-size:30px;color:#2e7d32;"></i>
+            </div>
+            <h4 style="margin:0 0 8px;font-weight:700;color:#1e293b;">Opening UPI Payment App...</h4>
+            <p style="margin:0 0 16px;color:#64748b;font-size:14px;">Redirecting you to pay <strong style="color:#0f172a;font-size:18px;">₹${escapeHtml(am)}</strong> to <strong>${escapeHtml(pn)}</strong></p>
+            
+            <a href="${escapeHtml(upiUri)}" class="btn btn-success w-100 py-3 mb-2 fw-bold" style="background:#16a34a;border:none;border-radius:12px;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;color:#fff;">
+              <i class="bi bi-lightning-charge-fill"></i> Tap to Open UPI App (₹${escapeHtml(am)})
+            </a>
+            <div style="font-size:12px;color:#64748b;margin-bottom:16px;">Google Pay · PhonePe · Paytm · BHIM · Cred · Any UPI App</div>
+            
+            <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:12px;margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px;">Or Scan QR Code to Pay:</div>
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}" alt="UPI QR" style="width:160px;height:160px;object-fit:contain;background:#fff;padding:4px;border-radius:8px;">
+              <div style="font-size:11px;color:#64748b;margin-top:6px;">UPI ID: <strong>${escapeHtml(pa)}</strong></div>
+            </div>
+            
+            <button type="button" class="btn btn-light w-100 btn-sm text-secondary" style="border-radius:8px;" onclick="document.querySelector('.upi-redirect-overlay')?.remove(); window.history.replaceState({}, '', window.location.pathname);">
+              Close &amp; Return to Restaurant
+            </button>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderOverlay);
+      } else {
+        renderOverlay();
+      }
+    } catch (e) {
+      console.warn('UPI redirect error:', e);
+    }
+  }
+
+  handleUpiPaymentRedirect();
+
   const MAIN_CATEGORY_IMAGES = {
     'Kathiyawadi & Gujarati Food': 'img/Kathiyawadi & Gujarati Food.avif',
     'Indian Sabji & Curry': 'img/Indian Sabji & Curry.jfif',
@@ -779,14 +842,30 @@
     if ($('checkoutUpiIdText')) $('checkoutUpiIdText').textContent = upiId;
     if ($('checkoutQrAmount')) $('checkoutQrAmount').textContent = `Total to Pay: ${money(amount)}`;
 
+    const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restName)}&am=${amount}&cu=INR&tn=${encodeURIComponent('Restaurant Order')}`;
+
     const qrImg = $('checkoutQrImg');
     if (qrImg) {
       if (settings.qr_image_url && settings.qr_image_url.trim()) {
         qrImg.src = settings.qr_image_url.trim();
       } else {
-        const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restName)}&am=${amount}&cu=INR&tn=${encodeURIComponent('Restaurant Order')}`;
         qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
       }
+      qrImg.style.cursor = 'pointer';
+      qrImg.title = 'Click to open UPI Payment App';
+      qrImg.onclick = () => { window.location.href = upiString; };
+    }
+
+    const qrBox = $('paymentQrBox');
+    if (qrBox) {
+      let payAppBtn = qrBox.querySelector('.checkout-pay-app-btn');
+      if (!payAppBtn) {
+        payAppBtn = document.createElement('a');
+        payAppBtn.className = 'btn btn-outline-success btn-sm w-100 mt-2 fw-bold checkout-pay-app-btn';
+        payAppBtn.innerHTML = '<i class="bi bi-wallet2 me-1"></i>Tap to Pay via UPI App (GPay/PhonePe/Paytm)';
+        qrBox.appendChild(payAppBtn);
+      }
+      payAppBtn.href = upiString;
     }
 
     checkoutModal.show();
@@ -813,7 +892,7 @@
     localStorage.setItem('daily_order_seq', String(seq));
 
     const seqFormatted = String(seq).padStart(4, '0');
-    const orderId = `DATE(${ddmmyy})-(${seqFormatted})`;
+    const orderId = `(${ddmmyy})-(${seqFormatted})`;
     const displayDate = `${dd}/${mm}/${now.getFullYear()}`;
 
     return { orderId, displayDate, ddmmyy, seqFormatted };
@@ -863,8 +942,9 @@
     const restName = (settings.restaurant_name || cfg.defaultRestaurantName || 'Radhe Krushna Food Zone').trim();
     const disc = discountAmount();
     const amount = total();
-    const qrLink = (settings.qr_image_url && settings.qr_image_url.trim()) ||
-      `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=${encodeURIComponent(restName)}&am=${amount}&cu=INR&tn=Order`)}`;
+    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Order ${orderId}`)}`;
+    const pageUrl = window.location.href.split('?')[0].split('#')[0];
+    const qrLink = `${pageUrl}?pay_upi=1&pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(restName)}&am=${amount}&tn=${encodeURIComponent(`Order ${orderId}`)}`;
 
     const lines = cartRows().map((x, i) => `${i + 1}. ${x.name}\n   ${x.quantity} x ${money(x.price)} = ${money(x.price * x.quantity)}`).join('\n\n');
     const address = [$('customerAddress').value.trim(), $('customerArea').value.trim(), $('customerCity').value.trim()].filter(Boolean).join(', ');
@@ -874,11 +954,13 @@
       `*NEW RESTAURANT ORDER*`,
       `Order ID: ${orderId}`,
       `Date: ${displayDate}`,
+      '------------------------------',
       '',
       '*CUSTOMER DETAILS*',
       `Name: ${$('customerName').value.trim()}`,
       `Phone: ${phone}`,
-      `Address: ${address}`
+      `Address: ${address}`,
+      '------------------------------',
     ];
 
     if (notes) {
@@ -886,9 +968,11 @@
     }
 
     messageLines.push(
+      '------------------------------',
       '',
       '*ORDER ITEMS*',
       lines,
+      '------------------------------',
       '',
       '*PAYMENT SUMMARY*',
       `Subtotal: ${money(subtotal())}`
@@ -903,11 +987,15 @@
     messageLines.push(
       `Delivery: ${money(delivery())}`,
       `*GRAND TOTAL: ${money(amount)}*`,
+      '------------------------------',
       '',
       '*PAYMENT & DELIVERY*',
       `*CASH ON DELIVERY (COD) IS AVAILABLE!*`,
-      `Pay via UPI: ${upiId}`,
-      `UPI Payment QR Code: ${qrLink}`,
+      `Pay via UPI ID: ${upiId}`,
+      `👉 Tap to Pay (₹${amount}) in UPI App:`,
+      `${qrLink}`,
+      '',
+      `Direct UPI Link: ${upiUri}`,
       '',
       'Please confirm this order.'
     );
