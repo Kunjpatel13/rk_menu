@@ -834,6 +834,13 @@
 
     const name = settings.restaurant_name || cfg.defaultRestaurantName;
     if ($('restaurantName')) $('restaurantName').textContent = name;
+    if ($('footerRestaurantName')) $('footerRestaurantName').textContent = name;
+    if ($('footerNameBottom')) $('footerNameBottom').textContent = name;
+    if ($('footerAddress')) $('footerAddress').textContent = settings.address || 'AB-3, Mile Stone, Anand Vidhyanagar Road, Anand - 388 001';
+    if ($('footerHours')) $('footerHours').textContent = settings.opening_hours || 'Daily · 11:00 AM – 11:00 PM';
+    if ($('footerPhone')) $('footerPhone').textContent = settings.contact_phone || '7069300077 / 9979678889';
+    if ($('footerWhatsapp')) $('footerWhatsapp').textContent = settings.whatsapp_number || '9979678889';
+    if ($('year')) $('year').textContent = new Date().getFullYear();
     updateLiveStatus();
 
     // Offer banner

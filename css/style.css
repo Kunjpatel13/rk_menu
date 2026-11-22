@@ -345,7 +345,7 @@ h2 {
 /* Menu Section */
 .section-space {
   padding-top: 28px;
-  padding-bottom: 110px;
+  padding-bottom: 50px;
 }
 
 .section-heading {
@@ -782,24 +782,32 @@ h2 {
 
 /* Footer */
 .site-footer {
-  background: #29231e;
+  background: #191410;
   color: white;
-  padding-bottom: 75px;
+  padding-top: 10px;
+  padding-bottom: 85px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.site-footer h6 {
+.site-footer h6,
+.site-footer .footer-heading {
   font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 12px;
+  color: #ffffff;
 }
 
 .footer-muted {
   color: #c1b5aa;
   line-height: 1.7;
+  font-size: 0.9rem;
 }
 
 .footer-bottom {
-  border-top: 1px solid #51463d;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 18px;
-  margin-top: 22px;
+  margin-top: 24px;
   color: #a99b8e;
   font-size: .85rem;
 }
@@ -1220,7 +1228,11 @@ a:focus-visible {
 
   .section-space {
     padding-top: 24px;
-    padding-bottom: 130px;
+    padding-bottom: 45px;
+  }
+
+  .site-footer {
+    padding-bottom: 125px;
   }
 
   .mobile-cart-bar {
