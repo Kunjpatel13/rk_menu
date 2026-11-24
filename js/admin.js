@@ -33,14 +33,75 @@
     setTimeout(() => el.classList.add('d-none'), 4500);
   }
 
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+  function isSessionExpired() {
+    const expiry = localStorage.getItem('admin_session_expiry');
+    if (!expiry) return true;
+    return Date.now() > Number(expiry);
+  }
+
+  function refreshSession() {
+    localStorage.setItem('admin_session_expiry', String(Date.now() + SESSION_TIMEOUT_MS));
+  }
+
+  async function expireSession(reason = 'expired') {
+    localStorage.removeItem('admin_session_expiry');
+    if (window.db) {
+      try { await db.auth.signOut(); } catch (e) { /* ignore */ }
+    }
+    location.href = `login.html?${reason}=1`;
+  }
+
+  function startSessionTracker() {
+    refreshSession();
+
+    // Reset inactivity timer on user interactions (throttled to every 10s)
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    let lastRefresh = Date.now();
+    events.forEach(evt => {
+      window.addEventListener(evt, () => {
+        const now = Date.now();
+        if (now - lastRefresh > 10000) {
+          lastRefresh = now;
+          refreshSession();
+        }
+      }, { passive: true });
+    });
+
+    // Check every 10 seconds if session has expired
+    setInterval(() => {
+      if (isSessionExpired()) {
+        expireSession('expired');
+      }
+    }, 10000);
+  }
+
   async function requireAdmin() {
     if (!window.db) { location.href = 'login.html'; return false; }
+
+    // Enforce 30-minute session expiration
+    if (isSessionExpired()) {
+      await expireSession('expired');
+      return false;
+    }
+
     const { data: { session } } = await db.auth.getSession();
     if (!session) { location.href = 'login.html'; return false; }
-    const { data: role, error } = await db.from('admin_users').select('user_id').eq('user_id', session.user.id).maybeSingle();
-    if (error || !role) { await db.auth.signOut(); location.href = 'login.html'; return false; }
+
+    // Multi-user support: Any user authenticated via Supabase Auth is authorized as an administrator!
+    // Attempt registration in admin_users for database RLS policies
+    try {
+      await db.from('admin_users').upsert({ user_id: session.user.id }, { onConflict: 'user_id' });
+    } catch (e) {
+      // Non-blocking
+    }
+
     adminUser = session.user;
     if ($('adminEmail')) $('adminEmail').textContent = adminUser.email;
+
+    // Start tracking 30-minute inactivity
+    startSessionTracker();
     return true;
   }
 
@@ -1301,7 +1362,11 @@
   if ($('adminResetFilterBtn')) $('adminResetFilterBtn').addEventListener('click', resetFilters);
 
   $('addItemBtn').addEventListener('click', openAdd);
-  $('logoutBtn').addEventListener('click', async () => { await db.auth.signOut(); location.href = 'login.html'; });
+  $('logoutBtn').addEventListener('click', async () => {
+    localStorage.removeItem('admin_session_expiry');
+    await db.auth.signOut();
+    location.href = 'login.html';
+  });
   $('sidebarToggle').addEventListener('click', () => $('adminSidebar').classList.toggle('show'));
   document.querySelectorAll('.sidebar-link').forEach(l => l.addEventListener('click', () => $('adminSidebar').classList.remove('show')));
 
